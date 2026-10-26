@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mess Management System — Interactive ER Diagram</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+            --card-border: #334155;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-blue: #38bdf8;
+            --accent-green: #4ade80;
+            --accent-amber: #fbbf24;
+            --accent-rose: #fb7185;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+        header {
+            background-color: var(--panel-bg);
+            border-bottom: 1px solid var(--card-border);
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+        }
+        .header-title h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--accent-blue);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .header-title p {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+        }
+        .badge-list {
+            display: flex;
+            gap: 8px;
+        }
+        .badge {
+            font-size: 0.75rem;
+            padding: 4px 10px;
+            border-radius: 9999px;
+            background: #334155;
+            color: #cbd5e1;
+            font-weight: 500;
+        }
+        .badge.highlight {
+            background: rgba(56, 189, 248, 0.2);
+            color: var(--accent-blue);
+            border: 1px solid rgba(56, 189, 248, 0.4);
+        }
+        .main-container {
+            display: flex;
+            flex: 1;
+            height: calc(100vh - 65px);
+            position: relative;
+        }
+        .diagram-container {
+            flex: 1;
+            height: 100%;
+            position: relative;
+            background: radial-gradient(circle at 50% 50%, #1e293b 0%, #0f172a 100%);
+            overflow: hidden;
+        }
+        #mermaid-output {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #mermaid-output svg {
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+        #mermaid-output svg:active {
+            cursor: grabbing;
+        }
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: var(--panel-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            z-index: 20;
+        }
+        .controls button {
+            background: #334155;
+            color: #fff;
+            border: none;
+            width: 34px;
+            height: 34px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+        .controls button:hover {
+            background: var(--accent-blue);
+            color: #0f172a;
+        }
+        .sidebar {
+            width: 360px;
+            background: var(--panel-bg);
+            border-left: 1px solid var(--card-border);
+            height: 100%;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .section-title {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--accent-amber);
+            font-weight: 700;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 4px;
+        }
+        .card {
+            background: #0f172a;
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 0.85rem;
+        }
+        .card-header {
+            font-weight: 600;
+            color: var(--accent-blue);
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .attr-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 0;
+            border-bottom: 1px dashed #1e293b;
+        }
+        .attr-name {
+            color: #e2e8f0;
+            font-family: monospace;
+        }
+        .attr-badge {
+            font-size: 0.7rem;
+            color: var(--accent-green);
+        }
+        .attr-required {
+            color: var(--accent-rose);
+            font-weight: bold;
+        }
+        .legend-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            font-size: 0.78rem;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        .dot.pk { background: var(--accent-amber); }
+        .dot.fk { background: var(--accent-blue); }
+        .dot.req { background: var(--accent-rose); }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-title">
+            <h1>🏛️ Mess Management System — Entity Relationship (ER) Model</h1>
+            <p>Database Relational Architecture • Normal Form: 3NF / BCNF • 12 Relations</p>
+        </div>
+        <div class="badge-list">
+            <span class="badge highlight">Required: Name • Reg No • Room • Veg/Non-Veg</span>
+            <span class="badge">Drag to Pan • Scroll to Zoom</span>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- Interactive Canvas Area -->
+        <div class="diagram-container">
+            <div id="mermaid-output">
+                <pre class="mermaid">
+erDiagram
+    HOSTELS ||--o{ STUDENTS : "accommodates"
+    HOSTELS ||--o{ MESSES : "houses"
+    MESSES ||--o{ STUDENT_MESS_SUBSCRIPTIONS : "subscribes_to"
+    STUDENTS ||--o{ STUDENT_MESS_SUBSCRIPTIONS : "enrolls_in"
+    STUDENTS ||--o{ MEAL_ATTENDANCE : "scans_meal_swipes"
+    MESSES ||--o{ MEAL_ATTENDANCE : "serves"
+    MEAL_SLOTS ||--o{ MEAL_ATTENDANCE : "categorizes"
+    MESSES ||--o{ WEEKLY_MENUS : "publishes_menu"
+    MEAL_SLOTS ||--o{ WEEKLY_MENUS : "scheduled_in"
+    STUDENTS ||--o{ MESS_REBATES : "applies_leave"
+    STUDENTS ||--o{ MONTHLY_BILLS : "billed_to"
+    MESSES ||--o{ MONTHLY_BILLS : "issues_invoices"
+    STUDENTS ||--o{ GUEST_MEALS : "books_guest_tokens"
+    MESSES ||--o{ GUEST_MEALS : "fulfills_coupons"
+    MEAL_SLOTS ||--o{ GUEST_MEALS : "scheduled_for"
+    STUDENTS ||--o{ MESS_FEEDBACKS : "rates_and_complains"
+    MESSES ||--o{ MESS_FEEDBACKS : "evaluated_by"
+    MEAL_SLOTS ||--o{ MESS_FEEDBACKS : "pertains_to"
+    MESSES ||--o{ INVENTORY_ITEMS : "stocks_supplies"
+
+    HOSTELS {
+        int hostel_id PK
+        string hostel_name UK
+        string block_code UK
+        string gender_type
+        string warden_name
+        string warden_contact
+    }
+
+    STUDENTS {
+        int student_id PK
+        string registration_no UK "Registration Number (Required)"
+        string full_name "Full Name (Required)"
+        int hostel_id FK "Hostel Block FK"
+        string room_no "Room Number (Required)"
+        string dietary_preference "VEG / NON_VEG (Required)"
+        string email UK
+        string phone_number
+        string department
+        int year_of_study
+        string emergency_contact
+        string blood_group
+        string account_status
+    }
+
+    MESSES {
+        int mess_id PK
+        string mess_name UK
+        string mess_type "PURE_VEG / VEG_NON_VEG"
+        int hostel_id FK
+        int capacity
+        string caterer_name
+        decimal monthly_base_fee
+        decimal per_day_rebate_rate
+        string status
+    }
+
+    MEAL_SLOTS {
+        int slot_id PK
+        string slot_name UK "BREAKFAST / LUNCH / SNACKS / DINNER"
+        time start_time
+        time end_time
+        decimal guest_rate
+    }
+
+    STUDENT_MESS_SUBSCRIPTIONS {
+        int subscription_id PK
+        int student_id FK
+        int mess_id FK
+        date start_date
+        date end_date
+        string plan_type "MONTHLY / SEMESTER / ANNUAL"
+        string status "ACTIVE / EXPIRED"
+    }
+
+    WEEKLY_MENUS {
+        int menu_id PK
+        int mess_id FK
+        string day_of_week "MON..SUN"
+        int slot_id FK
+        string diet_category "VEG / NON_VEG / COMMON"
+        string menu_items
+        string special_notes
+    }
+
+    MEAL_ATTENDANCE {
+        int attendance_id PK
+        int student_id FK
+        int mess_id FK
+        int slot_id FK
+        date attendance_date
+        string diet_served "VEG / NON_VEG / JAIN"
+        string verification_type "RFID / BIOMETRIC"
+        timestamp scanned_at
+    }
+
+    MESS_REBATES {
+        int rebate_id PK
+        int student_id FK
+        date start_date
+        date end_date
+        string reason
+        string status "PENDING / APPROVED / REJECTED"
+        string approved_by
+    }
+
+    MONTHLY_BILLS {
+        int bill_id PK
+        int student_id FK
+        int mess_id FK
+        int billing_month
+        int billing_year
+        decimal base_fee
+        int rebate_days
+        decimal rebate_amount
+        decimal guest_charges
+        decimal fines_or_extras
+        decimal net_payable
+        string payment_status "PAID / UNPAID / OVERDUE"
+        date due_date
+        timestamp paid_at
+    }
+
+    GUEST_MEALS {
+        int guest_meal_id PK
+        int host_student_id FK
+        int mess_id FK
+        int slot_id FK
+        date booking_date
+        int guest_count
+        string diet_preference "VEG / NON_VEG"
+        decimal total_charge
+        string status
+    }
+
+    MESS_FEEDBACKS {
+        int feedback_id PK
+        int student_id FK
+        int mess_id FK
+        int slot_id FK
+        int rating "1 to 5"
+        string category "FOOD_QUALITY / HYGIENE"
+        string comments
+        string status
+    }
+
+    INVENTORY_ITEMS {
+        int item_id PK
+        int mess_id FK
+        string item_name
+        string category "GRAINS / MEAT / DAIRY"
+        string unit "KG / LITRE"
+        decimal current_stock
+        decimal reorder_threshold
+    }
+                </pre>
+            </div>
+            
+            <div class="controls">
+                <button id="zoom-in" title="Zoom In">+</button>
+                <button id="zoom-out" title="Zoom Out">−</button>
+                <button id="reset-zoom" title="Reset View">↺</button>
+            </div>
+        </div>
+
+        <!-- Sidebar Specifications -->
+        <aside class="sidebar">
+            <div>
+                <div class="section-title">Diagram Legend</div>
+                <div class="legend-grid">
+                    <div class="legend-item"><span class="dot pk"></span> Primary Key (PK)</div>
+                    <div class="legend-item"><span class="dot fk"></span> Foreign Key (FK)</div>
+                    <div class="legend-item"><span class="dot req"></span> User Requested</div>
+                    <div class="legend-item"><span style="color:#38bdf8">||--o{</span> One-to-Many</div>
+                </div>
+            </div>
+
+            <div>
+                <div class="section-title">Core Required Attributes</div>
+                <div class="card">
+                    <div class="card-header">
+                        <span>STUDENTS Entity</span>
+                        <span style="color:var(--accent-amber)">Core Relation</span>
+                    </div>
+                    <div class="attr-item">
+                        <span class="attr-name attr-required">full_name</span>
+                        <span class="attr-badge">Student Name</span>
+                    </div>
+                    <div class="attr-item">
+                        <span class="attr-name attr-required">registration_no</span>
+                        <span class="attr-badge">Unique Reg No</span>
+                    </div>
+                    <div class="attr-item">
+                        <span class="attr-name attr-required">room_no</span>
+                        <span class="attr-badge">Room Number</span>
+                    </div>
+                    <div class="attr-item">
+                        <span class="attr-name">hostel_id</span>
+                        <span class="attr-badge">FK &rarr; Hostels</span>
+                    </div>
+                    <div class="attr-item">
+                        <span class="attr-name attr-required">dietary_preference</span>
+                        <span class="attr-badge">VEG / NON_VEG</span>
+                    </div>
+                    <div class="attr-item">
+                        <span class="attr-name">phone_number</span>
+                        <span class="attr-badge">Contact No</span>
+                    </div>
+                    <div class="attr-item">
+                        <span class="attr-name">department</span>
+                        <span class="attr-badge">Branch/Dept</span>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div class="section-title">Cardinality Explanations</div>
+                <div class="card" style="margin-bottom: 8px;">
+                    <div class="card-header">Hostel &rarr; Students (1 : N)</div>
+                    <p style="color:var(--text-muted); font-size: 0.8rem;">Each student belongs to exactly one hostel block, while a hostel houses multiple students.</p>
+                </div>
+                <div class="card" style="margin-bottom: 8px;">
+                    <div class="card-header">Students &harr; Messes (M : N via Subscriptions)</div>
+                    <p style="color:var(--text-muted); font-size: 0.8rem;">Resolved by junction table <code>student_mess_subscriptions</code> with subscription start and end dates.</p>
+                </div>
+                <div class="card" style="margin-bottom: 8px;">
+                    <div class="card-header">Attendance Swipes (1 : N)</div>
+                    <p style="color:var(--text-muted); font-size: 0.8rem;">Every swipe records student ID, mess ID, meal slot (Breakfast/Lunch/Dinner), and exact timestamp.</p>
+                </div>
+                <div class="card">
+                    <div class="card-header">Rebates & Billing (1 : N)</div>
+                    <p style="color:var(--text-muted); font-size: 0.8rem;">Approved leaves automatically calculate rebate deductions per day against monthly base fees.</p>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'dark',
+            er: {
+                useMaxWidth: false,
+                diagramPadding: 40,
+                layoutDirection: 'TB'
+            }
+        });
+
+        // Initialize pan-zoom once Mermaid renders the SVG
+        window.addEventListener('load', () => {
+            const checkSvg = setInterval(() => {
+                const svg = document.querySelector('#mermaid-output svg');
+                if (svg) {
+                    clearInterval(checkSvg);
+                    svg.setAttribute('id', 'er-svg');
+                    const panZoom = svgPanZoom('#er-svg', {
+                        zoomEnabled: true,
+                        controlIconsEnabled: false,
+                        fit: true,
+                        center: true,
+                        minZoom: 0.2,
+                        maxZoom: 6,
+                        zoomScaleSensitivity: 0.25
+                    });
+
+                    document.getElementById('zoom-in').addEventListener('click', () => panZoom.zoomIn());
+                    document.getElementById('zoom-out').addEventListener('click', () => panZoom.zoomOut());
+                    document.getElementById('reset-zoom').addEventListener('click', () => {
+                        panZoom.resetZoom();
+                        panZoom.center();
+                    });
+                }
+            }, 300);
+        });
+    </script>
+</body>
+</html>

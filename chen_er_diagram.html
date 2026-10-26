@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Classical Chen's ER Diagram — Mess Management System</title>
+    <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #090d16;
+            --panel-dark: #1e293b;
+            --border-dark: #334155;
+            --text-light: #f8fafc;
+            --accent-cyan: #38bdf8;
+            --accent-amber: #fbbf24;
+            --accent-rose: #f43f5e;
+            --accent-purple: #c084fc;
+            --accent-emerald: #34d399;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+        header {
+            background-color: var(--panel-dark);
+            border-bottom: 1px solid var(--border-dark);
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+        }
+        .header-title h1 {
+            font-size: 1.25rem;
+            color: var(--accent-cyan);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .header-title p {
+            font-size: 0.82rem;
+            color: #94a3b8;
+            margin-top: 2px;
+        }
+        .quick-nav {
+            display: flex;
+            gap: 10px;
+        }
+        .btn-link {
+            text-decoration: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            background: #334155;
+            color: #f8fafc;
+            transition: all 0.2s;
+        }
+        .btn-link:hover {
+            background: var(--accent-cyan);
+            color: #090d16;
+        }
+        .main-layout {
+            display: flex;
+            flex: 1;
+            height: calc(100vh - 65px);
+        }
+        .viewport-container {
+            flex: 1;
+            height: 100%;
+            position: relative;
+            background: radial-gradient(circle at center, #131b2e 0%, #090d16 100%);
+            overflow: hidden;
+        }
+        #svg-embed {
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+        #svg-embed:active {
+            cursor: grabbing;
+        }
+        .hud-controls {
+            position: absolute;
+            bottom: 24px;
+            right: 24px;
+            background: rgba(30, 41, 59, 0.95);
+            border: 1px solid var(--border-dark);
+            border-radius: 8px;
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+            backdrop-filter: blur(8px);
+        }
+        .hud-controls button {
+            width: 36px;
+            height: 36px;
+            background: #334155;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1.15rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+        .hud-controls button:hover {
+            background: var(--accent-cyan);
+            color: #090d16;
+        }
+        .sidebar-specs {
+            width: 380px;
+            background: var(--panel-dark);
+            border-left: 1px solid var(--border-dark);
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .section-header {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--accent-amber);
+            font-weight: 700;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 6px;
+        }
+        .symbol-card {
+            background: #0f172a;
+            border: 1px solid var(--border-dark);
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .symbol-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.82rem;
+            padding: 4px 0;
+            border-bottom: 1px dashed #1e293b;
+        }
+        .symbol-name { font-weight: 600; color: #e2e8f0; }
+        .symbol-shape { font-family: monospace; font-size: 0.78rem; color: var(--accent-cyan); }
+        .req-highlight {
+            background: rgba(245, 158, 11, 0.1);
+            border-left: 3px solid var(--accent-amber);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 0.82rem;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-title">
+            <h1>🔷 Classical Chen's ER Diagram — Mess Management System</h1>
+            <p>Rectangles (Entities) • Diamonds (Relationships) • Weak Entities • Identifying Rel • Primary/Partial Keys • Derived Attributes</p>
+        </div>
+        <div class="quick-nav">
+            <a href="chen_er_diagram.svg" target="_blank" class="btn-link">Open Raw SVG ↗</a>
+            <a href="database_design.md" class="btn-link">Database Design Docs ↗</a>
+        </div>
+    </header>
+
+    <div class="main-layout">
+        <!-- SVG Canvas Area -->
+        <div class="viewport-container">
+            <object id="svg-embed" type="image/svg+xml" data="chen_er_diagram.svg"></object>
+
+            <div class="hud-controls">
+                <button id="btn-zoom-in" title="Zoom In">+</button>
+                <button id="btn-zoom-out" title="Zoom Out">−</button>
+                <button id="btn-reset" title="Fit to Screen">↺</button>
+            </div>
+        </div>
+
+        <!-- Sidebar Reference -->
+        <aside class="sidebar-specs">
+            <div>
+                <div class="section-header">CHEN NOTATION CHEAT SHEET</div>
+                <div class="symbol-card">
+                    <div class="symbol-row">
+                        <span class="symbol-name">Strong Entity</span>
+                        <span class="symbol-shape">Single Rectangle ▭</span>
+                    </div>
+                    <div class="symbol-row">
+                        <span class="symbol-name">Weak Entity</span>
+                        <span class="symbol-shape" style="color:var(--accent-purple)">Double Rectangle ⧉</span>
+                    </div>
+                    <div class="symbol-row">
+                        <span class="symbol-name">Relationship</span>
+                        <span class="symbol-shape" style="color:var(--accent-emerald)">Diamond ◇</span>
+                    </div>
+                    <div class="symbol-row">
+                        <span class="symbol-name">Identifying Rel.</span>
+                        <span class="symbol-shape" style="color:var(--accent-rose)">Double Diamond ◈</span>
+                    </div>
+                    <div class="symbol-row">
+                        <span class="symbol-name">Primary Key (PK)</span>
+                        <span class="symbol-shape" style="color:var(--accent-amber)">Underlined Oval ⬭</span>
+                    </div>
+                    <div class="symbol-row">
+                        <span class="symbol-name">Partial Key / Discrim.</span>
+                        <span class="symbol-shape" style="color:var(--accent-rose)">Dashed Underline Oval</span>
+                    </div>
+                    <div class="symbol-row">
+                        <span class="symbol-name">Multivalued Attribute</span>
+                        <span class="symbol-shape" style="color:var(--accent-purple)">Double Oval ⧭</span>
+                    </div>
+                    <div class="symbol-row">
+                        <span class="symbol-name">Derived Attribute</span>
+                        <span class="symbol-shape" style="color:var(--accent-cyan)">Dashed Oval ⬬</span>
+                    </div>
+                    <div class="symbol-row">
+                        <span class="symbol-name">Composite Attribute</span>
+                        <span class="symbol-shape">Branching Ovals</span>
+                    </div>
+                    <div class="symbol-row">
+                        <span class="symbol-name">Total Participation</span>
+                        <span class="symbol-shape">Double Line ══</span>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div class="section-header">MAPPING OF USER REQUIREMENTS</div>
+                <div class="req-highlight">
+                    <strong>Requested Attributes in STUDENT Entity:</strong>
+                    <ul style="margin: 6px 0 0 18px; line-height: 1.5;">
+                        <li><strong>Name</strong>: Composite attribute (<code>First_Name</code> + <code>Last_Name</code>).</li>
+                        <li><strong>Registration number</strong>: Primary key (solid underline).</li>
+                        <li><strong>Room number</strong>: Simple attribute <code>Room_No</code> (linked to Hostel).</li>
+                        <li><strong>Veg / Non-Veg Food</strong>: Dietary preference attribute (<code>Veg</code>, <code>Non-Veg</code>, <code>Jain</code>, <code>Egg</code>).</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div>
+                <div class="section-header">WEAK ENTITIES &amp; DERIVED ATTRIBUTES</div>
+                <div class="symbol-card">
+                    <div style="font-size:0.82rem; line-height: 1.45;">
+                        <p style="margin-bottom:8px;"><strong>1. MESS_REBATE (Weak Entity)</strong><br>
+                        Identified by strong entity <code>STUDENT</code> via double diamond <code>APPLIES_FOR</code>. Partial key: <code>Rebate_No</code> (dashed underline).<br>
+                        <em>Derived Attribute:</em> <code>Leave_Days</code> = (End_Date - Start_Date + 1).</p>
+                        
+                        <p><strong>2. MONTHLY_BILL (Weak Entity)</strong><br>
+                        Identified via double diamond <code>GENERATED_FOR</code>. Partial key: <code>Billing_Month</code>.<br>
+                        <em>Derived Attributes:</em> <code>Rebate_Discount</code> and <code>Net_Payable</code> (Base - Rebate + Extras).</p>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script>
+        window.addEventListener('load', () => {
+            const embed = document.getElementById('svg-embed');
+            embed.addEventListener('load', () => {
+                const svgDoc = embed.contentDocument;
+                const svgElement = svgDoc.querySelector('svg');
+                if (svgElement) {
+                    const panZoom = svgPanZoom(svgElement, {
+                        zoomEnabled: true,
+                        controlIconsEnabled: false,
+                        fit: true,
+                        center: true,
+                        minZoom: 0.3,
+                        maxZoom: 6,
+                        zoomScaleSensitivity: 0.25
+                    });
+
+                    document.getElementById('btn-zoom-in').addEventListener('click', () => panZoom.zoomIn());
+                    document.getElementById('btn-zoom-out').addEventListener('click', () => panZoom.zoomOut());
+                    document.getElementById('btn-reset').addEventListener('click', () => {
+                        panZoom.resetZoom();
+                        panZoom.center();
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
