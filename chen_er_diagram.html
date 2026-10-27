@@ -175,10 +175,11 @@
     <header>
         <div class="header-title">
             <h1>🔷 Classical Chen's ER Diagram — Mess Management System</h1>
-            <p>Rectangles (Entities) • Diamonds (Relationships) • Weak Entities • Identifying Rel • Primary/Partial Keys • Derived Attributes</p>
+            <p>Core model: Rectangles (Entities) • Diamonds (Relationships) • Weak Entities • Identifying Rel • Primary/Partial Keys • Derived Attributes</p>
         </div>
         <div class="quick-nav">
             <a href="chen_er_diagram.svg" target="_blank" class="btn-link">Open Raw SVG ↗</a>
+            <a href="er_diagram.html" class="btn-link">Full 16-Table ER ↗</a>
             <a href="database_design.md" class="btn-link">Database Design Docs ↗</a>
         </div>
     </header>
@@ -226,7 +227,7 @@
                     </div>
                     <div class="symbol-row">
                         <span class="symbol-name">Multivalued Attribute</span>
-                        <span class="symbol-shape" style="color:var(--accent-purple)">Double Oval ⧭</span>
+                        <span class="symbol-shape" style="color:var(--accent-purple)">Double Oval ⧭ (unused)</span>
                     </div>
                     <div class="symbol-row">
                         <span class="symbol-name">Derived Attribute</span>
@@ -234,7 +235,7 @@
                     </div>
                     <div class="symbol-row">
                         <span class="symbol-name">Composite Attribute</span>
-                        <span class="symbol-shape">Branching Ovals</span>
+                        <span class="symbol-shape">Branching Ovals (unused)</span>
                     </div>
                     <div class="symbol-row">
                         <span class="symbol-name">Total Participation</span>
@@ -248,10 +249,10 @@
                 <div class="req-highlight">
                     <strong>Requested Attributes in STUDENT Entity:</strong>
                     <ul style="margin: 6px 0 0 18px; line-height: 1.5;">
-                        <li><strong>Name</strong>: Composite attribute (<code>First_Name</code> + <code>Last_Name</code>).</li>
-                        <li><strong>Registration number</strong>: Primary key (solid underline).</li>
-                        <li><strong>Room number</strong>: Simple attribute <code>Room_No</code> (linked to Hostel).</li>
-                        <li><strong>Veg / Non-Veg Food</strong>: Dietary preference attribute (<code>Veg</code>, <code>Non-Veg</code>, <code>Jain</code>, <code>Egg</code>).</li>
+                        <li><strong>Name</strong>: <code>Full_Name</code> (single attribute, <code>students.full_name</code>).</li>
+                        <li><strong>Registration number</strong>: <code>Registration_No</code>, key attribute (solid underline).</li>
+                        <li><strong>Room number</strong>: <code>Room_No</code>, simple attribute (room within the hostel the student RESIDES_IN).</li>
+                        <li><strong>Veg / Non-Veg Food</strong>: <code>Dietary_Preference</code> = <code>VEG</code>, <code>NON_VEG</code>, <code>JAIN</code> or <code>EGG_ONLY</code>; FK to <code>diet_map</code>, which maps it to a kitchen group (VEG / NON_VEG).</li>
                     </ul>
                 </div>
             </div>
@@ -261,12 +262,14 @@
                 <div class="symbol-card">
                     <div style="font-size:0.82rem; line-height: 1.45;">
                         <p style="margin-bottom:8px;"><strong>1. MESS_REBATE (Weak Entity)</strong><br>
-                        Identified by strong entity <code>STUDENT</code> via double diamond <code>APPLIES_FOR</code>. Partial key: <code>Rebate_No</code> (dashed underline).<br>
-                        <em>Derived Attribute:</em> <code>Leave_Days</code> = (End_Date - Start_Date + 1).</p>
-                        
-                        <p><strong>2. MONTHLY_BILL (Weak Entity)</strong><br>
-                        Identified via double diamond <code>GENERATED_FOR</code>. Partial key: <code>Billing_Month</code>.<br>
-                        <em>Derived Attributes:</em> <code>Rebate_Discount</code> and <code>Net_Payable</code> (Base - Rebate + Extras).</p>
+                        Owned by <code>STUDENT</code> via double diamond <code>APPLIES_FOR</code>. Conceptual partial key: <code>Rebate_No</code> (physical table uses surrogate <code>rebate_id</code>, <code>ON DELETE CASCADE</code> from student).<br>
+                        <em>Derived:</em> <code>Leave_Days</code> = End_Date − Start_Date + 1 (computed in queries, not stored).</p>
+
+                        <p style="margin-bottom:8px;"><strong>2. MONTHLY_BILL (Weak Entity)</strong><br>
+                        Owned by <code>STUDENT</code> via double diamond <code>GENERATED_FOR</code>; also references <code>MESS</code> (FK + part of unique key). Partial key: <code>Billing_Month</code> + <code>Billing_Year</code>.<br>
+                        <em>Derived:</em> <code>Net_Payable</code> = Base_Fee − Rebate_Amount + Guest_Charges + Fines_Or_Extras (stored generated column). <code>Rebate_Amount</code> is a stored snapshot (rebate_days × mess rate at billing time), not derived.</p>
+
+                        <p><strong>Not drawn here:</strong> <code>diet_map</code>, <code>weekly_menus</code>, <code>meal_optouts</code>, <code>meal_production</code>, <code>food_waste_log</code>, <code>guest_meals</code>, <code>mess_feedbacks</code>, <code>inventory_items</code>. See the full 16-table ER.</p>
                     </div>
                 </div>
             </div>

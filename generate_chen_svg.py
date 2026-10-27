@@ -1,12 +1,21 @@
 """
 Generates a Chen-notation ER diagram (SVG) for the Mess Management System.
 
+Scope
+- CORE conceptual model only: HOSTEL, MESS, STUDENT, MEAL_SLOT + weak entities
+  MESS_REBATE, MONTHLY_BILL. Attribute names follow schema.sql columns.
+- Supporting tables (diet_map, weekly_menus, meal_optouts, meal_production,
+  food_waste_log, guest_meals, mess_feedbacks, inventory_items) are in
+  er_diagram.html (Mermaid, all 16 tables).
+
 Notation
 - Entity: rectangle                    - Weak entity: double rectangle
 - Relationship: diamond                - Identifying relationship: double diamond
 - Primary key: underlined oval         - Partial key: dashed-underlined oval
 - Multivalued: double oval             - Derived: dashed oval
 - Composite: oval with child ovals     - Total participation: double line
+  (multivalued / composite are supported by the renderer but unused: schema.sql
+  stores single-valued phone_number and full_name)
 
 Design notes
 - One token table (TOKENS) drives every colour, so the palette is changed in one place.
@@ -256,19 +265,17 @@ def build():
     link("STUDENT", "GENERATED_FOR", "1")
     link("MONTHLY_BILL", "GENERATED_FOR", "N", total=True)
 
-    # ---- STUDENT attributes ----------------------------------------------
+    # ---- STUDENT attributes (schema.sql: students) -------------------------
     attr("STUDENT", "Email", 700, 450)
     attr("STUDENT", "Registration_No", 860, 425, "pk", True)
     attr("STUDENT", "Room_No", 1020, 425, required=True)
-    attr("STUDENT", "Veg_Non_Veg", 1180, 450, required=True)
-    name_id = attr("STUDENT", "Name", 600, 745, required=True)
-    attr(name_id, "First_Name", 400, 690)
-    attr(name_id, "Last_Name", 400, 785)
-    attr("STUDENT", "Phone_Number", 640, 865, "multi")
+    attr("STUDENT", "Dietary_Preference", 1180, 450, required=True)
+    attr("STUDENT", "Full_Name", 600, 745, required=True)
+    attr("STUDENT", "Phone_Number", 640, 865)
     attr("STUDENT", "Department", 1260, 690)
     attr("STUDENT", "Year_of_Study", 1285, 775)
-    attr("STUDENT", "DOB", 850, 925)
-    attr("STUDENT", "Age", 1030, 925, "derived")
+    attr("STUDENT", "Emergency_Contact", 870, 925)
+    attr("STUDENT", "Account_Status", 1035, 925)
 
     # ---- HOSTEL attributes -----------------------------------------------
     arc("HOSTEL",
@@ -281,6 +288,7 @@ def build():
         1560, 340, 340, 200, [265, 235, 295, 325, 355, 25])
 
     # ---- SUBSCRIBES (relationship attributes) ----------------------------
+    attr("SUBSCRIBES", "Status", 1415, 539)
     attr("SUBSCRIBES", "Plan_Type", 1415, 585)
     attr("SUBSCRIBES", "Start_Date", 1415, 631)
     attr("SUBSCRIBES", "End_Date", 1415, 677)
@@ -295,15 +303,17 @@ def build():
         1830, 900, 290, 170, [300, 340, 20, 60])
 
     # ---- MESS_REBATE (weak) attributes -----------------------------------
+    # Rebate_No is the conceptual partial key; schema.sql uses surrogate rebate_id.
     arc("MESS_REBATE",
         [("Rebate_No", "partial"), "Start_Date", "End_Date", "Reason", "Status", ("Leave_Days", "derived")],
         520, 1270, 290, 175, [190, 158, 126, 94, 62, 30])
 
     # ---- MONTHLY_BILL (weak) attributes ----------------------------------
+    # Net_Payable is a STORED GENERATED column; Rebate_Amount is a stored snapshot.
     arc("MONTHLY_BILL",
-        [("Billing_Month", "partial"), "Base_Fee", ("Rebate_Discount", "derived"),
-         ("Net_Payable", "derived"), "Payment_Status"],
-        1200, 1270, 300, 175, [175, 140, 105, 70, 35])
+        [("Billing_Month", "partial"), "Billing_Year", "Base_Fee", "Rebate_Amount",
+         "Guest_Charges", ("Net_Payable", "derived"), "Payment_Status"],
+        1200, 1270, 300, 175, [175, 148, 121, 94, 67, 40, 15])
 
 
 # ---------------------------------------------------------------------------
@@ -405,8 +415,8 @@ def create_svg():
         f'<rect width="{W}" height="{H}" fill="url(#dots)"/>',
         # Header
         f'<text class="t-title" x="64" y="70">Mess Management System</text>',
-        f'<text class="t-sub" x="64" y="102">Entity-relationship diagram in Chen notation, '
-        f'with weak entities, identifying relationships, and composite, multivalued and derived attributes.</text>',
+        f'<text class="t-sub" x="64" y="102">Core entity-relationship model in Chen notation (students, hostels, messes, '
+        f'meal slots, rebates, billing). Menus, guests, feedback, inventory, opt-outs and waste: see er_diagram.html.</text>',
         f'<line x1="64" y1="124" x2="{W-64}" y2="124" stroke="{T["line_attr"]}" stroke-width="1"/>',
         f'<g transform="translate(0,{TOP - 100})">',
         "<!-- attribute connectors (back layer) -->",

@@ -209,7 +209,7 @@
     <header>
         <div class="header-title">
             <h1>🏛️ Mess Management System — Entity Relationship (ER) Model</h1>
-            <p>Database Relational Architecture • Normal Form: 3NF / BCNF • 12 Relations</p>
+            <p>Database Relational Architecture • 16 Tables • 5 Views • Normal Form: 3NF / BCNF (with documented snapshot columns)</p>
         </div>
         <div class="badge-list">
             <span class="badge highlight">Required: Name • Reg No • Room • Veg/Non-Veg</span>
@@ -223,33 +223,47 @@
             <div id="mermaid-output">
                 <pre class="mermaid">
 erDiagram
-    HOSTELS ||--o{ STUDENTS : "accommodates"
-    HOSTELS ||--o{ MESSES : "houses"
-    MESSES ||--o{ STUDENT_MESS_SUBSCRIPTIONS : "subscribes_to"
-    STUDENTS ||--o{ STUDENT_MESS_SUBSCRIPTIONS : "enrolls_in"
-    STUDENTS ||--o{ MEAL_ATTENDANCE : "scans_meal_swipes"
-    MESSES ||--o{ MEAL_ATTENDANCE : "serves"
-    MEAL_SLOTS ||--o{ MEAL_ATTENDANCE : "categorizes"
-    MESSES ||--o{ WEEKLY_MENUS : "publishes_menu"
-    MEAL_SLOTS ||--o{ WEEKLY_MENUS : "scheduled_in"
-    STUDENTS ||--o{ MESS_REBATES : "applies_leave"
-    STUDENTS ||--o{ MONTHLY_BILLS : "billed_to"
-    MESSES ||--o{ MONTHLY_BILLS : "issues_invoices"
-    STUDENTS ||--o{ GUEST_MEALS : "books_guest_tokens"
-    MESSES ||--o{ GUEST_MEALS : "fulfills_coupons"
-    MEAL_SLOTS ||--o{ GUEST_MEALS : "scheduled_for"
-    STUDENTS ||--o{ MESS_FEEDBACKS : "rates_and_complains"
-    MESSES ||--o{ MESS_FEEDBACKS : "evaluated_by"
-    MEAL_SLOTS ||--o{ MESS_FEEDBACKS : "pertains_to"
-    MESSES ||--o{ INVENTORY_ITEMS : "stocks_supplies"
+    HOSTELS ||--o{ STUDENTS : houses
+    HOSTELS |o--o{ MESSES : operates_in
+    DIET_MAP ||--o{ STUDENTS : classifies
+    MESSES ||--o{ STUDENT_MESS_SUBSCRIPTIONS : subscribes_to
+    STUDENTS ||--o{ STUDENT_MESS_SUBSCRIPTIONS : enrolls_in
+    STUDENTS ||--o{ MEAL_ATTENDANCE : logs_swipes
+    MESSES ||--o{ MEAL_ATTENDANCE : receives_diners
+    MEAL_SLOTS ||--o{ MEAL_ATTENDANCE : categorizes
+    MESSES ||--o{ WEEKLY_MENUS : serves_daily
+    MEAL_SLOTS ||--o{ WEEKLY_MENUS : schedules_for
+    STUDENTS ||--o{ MEAL_OPTOUTS : declares_skip
+    MESSES ||--o{ MEAL_OPTOUTS : receives_optout
+    MEAL_SLOTS ||--o{ MEAL_OPTOUTS : for_slot
+    MESSES ||--o{ MEAL_PRODUCTION : cooks
+    MEAL_SLOTS ||--o{ MEAL_PRODUCTION : for_slot
+    MEAL_PRODUCTION ||--o{ FOOD_WASTE_LOG : records_waste
+    WEEKLY_MENUS |o--o{ FOOD_WASTE_LOG : dish_level_waste
+    STUDENTS ||--o{ MESS_REBATES : submits_leave
+    STUDENTS ||--o{ MONTHLY_BILLS : billed_to
+    MESSES ||--o{ MONTHLY_BILLS : generates_for
+    STUDENTS ||--o{ GUEST_MEALS : books_for_guests
+    MESSES ||--o{ GUEST_MEALS : fulfills_guest_meals
+    MEAL_SLOTS ||--o{ GUEST_MEALS : scheduled_in
+    STUDENTS ||--o{ MESS_FEEDBACKS : submits_reviews
+    MESSES ||--o{ MESS_FEEDBACKS : reviewed_by_diners
+    MEAL_SLOTS |o--o{ MESS_FEEDBACKS : evaluated_during
+    WEEKLY_MENUS |o--o{ MESS_FEEDBACKS : dish_level_rating
+    MESSES ||--o{ INVENTORY_ITEMS : maintains_stock
 
     HOSTELS {
         int hostel_id PK
         string hostel_name UK
         string block_code UK
-        string gender_type
+        string gender_type "MALE / FEMALE / COED"
         string warden_name
         string warden_contact
+    }
+
+    DIET_MAP {
+        string dietary_preference PK "VEG / JAIN / NON_VEG / EGG_ONLY"
+        string kitchen_group "VEG / NON_VEG"
     }
 
     STUDENTS {
@@ -258,7 +272,7 @@ erDiagram
         string full_name "Full Name (Required)"
         int hostel_id FK "Hostel Block FK"
         string room_no "Room Number (Required)"
-        string dietary_preference "VEG / NON_VEG (Required)"
+        string dietary_preference FK "Veg / Non-Veg (Required)"
         string email UK
         string phone_number
         string department
@@ -271,10 +285,11 @@ erDiagram
     MESSES {
         int mess_id PK
         string mess_name UK
-        string mess_type "PURE_VEG / VEG_NON_VEG"
-        int hostel_id FK
+        string mess_type "PURE_VEG / VEG_NON_VEG / SPECIAL_DIET"
+        int hostel_id FK "nullable"
         int capacity
         string caterer_name
+        string caterer_contact
         decimal monthly_base_fee
         decimal per_day_rebate_rate
         string status
@@ -295,17 +310,50 @@ erDiagram
         date start_date
         date end_date
         string plan_type "MONTHLY / SEMESTER / ANNUAL"
-        string status "ACTIVE / EXPIRED"
+        string status "ACTIVE / EXPIRED / TRANSFERRED / CANCELLED"
+        int active_student_id UK "generated, one ACTIVE per student"
     }
 
     WEEKLY_MENUS {
         int menu_id PK
         int mess_id FK
-        string day_of_week "MON..SUN"
+        string day_of_week "MONDAY..SUNDAY"
         int slot_id FK
         string diet_category "VEG / NON_VEG / COMMON"
         string menu_items
         string special_notes
+    }
+
+    MEAL_OPTOUTS {
+        int optout_id PK
+        int student_id FK
+        int mess_id FK
+        int slot_id FK
+        date meal_date
+        string reason "ACADEMIC / EATING_OUT / OTHER"
+    }
+
+    MEAL_PRODUCTION {
+        int production_id PK
+        int mess_id FK
+        int slot_id FK
+        date production_date
+        string diet_category "VEG / NON_VEG / COMMON"
+        int planned_headcount
+        decimal prepared_kg
+        decimal cost_per_kg
+        string prepared_by
+    }
+
+    FOOD_WASTE_LOG {
+        int waste_id PK
+        int production_id FK
+        int menu_id FK "nullable"
+        string waste_stage "PREPARATION / LEFTOVER / PLATE"
+        string reason "OVERPRODUCTION / POOR_QUALITY / ..."
+        decimal waste_kg
+        string recorded_by
+        datetime recorded_at
     }
 
     MEAL_ATTENDANCE {
@@ -314,9 +362,9 @@ erDiagram
         int mess_id FK
         int slot_id FK
         date attendance_date
-        string diet_served "VEG / NON_VEG / JAIN"
-        string verification_type "RFID / BIOMETRIC"
-        timestamp scanned_at
+        string diet_served "VEG / NON_VEG / JAIN / EGG_ONLY"
+        string verification_type "RFID / BIOMETRIC / QR_SCAN / MANUAL"
+        datetime scanned_at
     }
 
     MESS_REBATES {
@@ -325,8 +373,9 @@ erDiagram
         date start_date
         date end_date
         string reason
-        string status "PENDING / APPROVED / REJECTED"
+        string status "PENDING / APPROVED / REJECTED / CANCELLED"
         string approved_by
+        string decision_remarks
     }
 
     MONTHLY_BILLS {
@@ -340,10 +389,10 @@ erDiagram
         decimal rebate_amount
         decimal guest_charges
         decimal fines_or_extras
-        decimal net_payable
-        string payment_status "PAID / UNPAID / OVERDUE"
+        decimal net_payable "generated"
+        string payment_status "UNPAID / PAID / OVERDUE / WAIVED"
         date due_date
-        timestamp paid_at
+        datetime paid_at
     }
 
     GUEST_MEALS {
@@ -355,26 +404,28 @@ erDiagram
         int guest_count
         string diet_preference "VEG / NON_VEG"
         decimal total_charge
-        string status
+        string status "BOOKED / CONSUMED / CANCELLED"
     }
 
     MESS_FEEDBACKS {
         int feedback_id PK
         int student_id FK
         int mess_id FK
-        int slot_id FK
+        int slot_id FK "nullable"
+        int menu_id FK "nullable, dish-level"
         int rating "1 to 5"
-        string category "FOOD_QUALITY / HYGIENE"
+        string plate_left "NONE / QUARTER / HALF / MOST"
+        string category "FOOD_QUALITY / HYGIENE / TASTE / ..."
         string comments
-        string status
+        string status "OPEN / UNDER_REVIEW / RESOLVED"
     }
 
     INVENTORY_ITEMS {
         int item_id PK
         int mess_id FK
         string item_name
-        string category "GRAINS / MEAT / DAIRY"
-        string unit "KG / LITRE"
+        string category "GRAINS_PULSES / DAIRY / MEAT_POULTRY / ..."
+        string unit "KG / LITRE / PACKET / DOZEN / UNIT"
         decimal current_stock
         decimal reorder_threshold
     }
@@ -397,6 +448,7 @@ erDiagram
                     <div class="legend-item"><span class="dot fk"></span> Foreign Key (FK)</div>
                     <div class="legend-item"><span class="dot req"></span> User Requested</div>
                     <div class="legend-item"><span style="color:#38bdf8">||--o{</span> One-to-Many</div>
+                    <div class="legend-item"><span style="color:#38bdf8">|o--o{</span> Optional One-to-Many</div>
                 </div>
             </div>
 
@@ -425,7 +477,7 @@ erDiagram
                     </div>
                     <div class="attr-item">
                         <span class="attr-name attr-required">dietary_preference</span>
-                        <span class="attr-badge">VEG / NON_VEG</span>
+                        <span class="attr-badge">FK &rarr; diet_map</span>
                     </div>
                     <div class="attr-item">
                         <span class="attr-name">phone_number</span>
@@ -442,19 +494,23 @@ erDiagram
                 <div class="section-title">Cardinality Explanations</div>
                 <div class="card" style="margin-bottom: 8px;">
                     <div class="card-header">Hostel &rarr; Students (1 : N)</div>
-                    <p style="color:var(--text-muted); font-size: 0.8rem;">Each student belongs to exactly one hostel block, while a hostel houses multiple students.</p>
+                    <p style="color:var(--text-muted); font-size: 0.8rem;">Each student belongs to exactly one hostel block, while a hostel houses multiple students. A mess may optionally belong to a hostel (nullable FK).</p>
                 </div>
                 <div class="card" style="margin-bottom: 8px;">
                     <div class="card-header">Students &harr; Messes (M : N via Subscriptions)</div>
-                    <p style="color:var(--text-muted); font-size: 0.8rem;">Resolved by junction table <code>student_mess_subscriptions</code> with subscription start and end dates.</p>
+                    <p style="color:var(--text-muted); font-size: 0.8rem;">Resolved by junction table <code>student_mess_subscriptions</code>. A generated column plus UNIQUE allows only one ACTIVE subscription per student.</p>
                 </div>
                 <div class="card" style="margin-bottom: 8px;">
                     <div class="card-header">Attendance Swipes (1 : N)</div>
-                    <p style="color:var(--text-muted); font-size: 0.8rem;">Every swipe records student ID, mess ID, meal slot (Breakfast/Lunch/Dinner), and exact timestamp.</p>
+                    <p style="color:var(--text-muted); font-size: 0.8rem;">Every swipe records student, mess, meal slot and timestamp. One swipe per student, slot and day.</p>
+                </div>
+                <div class="card" style="margin-bottom: 8px;">
+                    <div class="card-header">Rebates &amp; Billing (1 : N)</div>
+                    <p style="color:var(--text-muted); font-size: 0.8rem;">Approved leaves give <code>rebate_days</code> and a stored <code>rebate_amount</code> snapshot on the bill. <code>net_payable</code> is a generated column: base &minus; rebate + guest + fines.</p>
                 </div>
                 <div class="card">
-                    <div class="card-header">Rebates & Billing (1 : N)</div>
-                    <p style="color:var(--text-muted); font-size: 0.8rem;">Approved leaves automatically calculate rebate deductions per day against monthly base fees.</p>
+                    <div class="card-header">Kitchen &amp; Waste (1 : N)</div>
+                    <p style="color:var(--text-muted); font-size: 0.8rem;"><code>meal_optouts</code> and approved rebates cut the headcount forecast. <code>meal_production</code> records kg cooked per diet line; <code>food_waste_log</code> records waste by stage and reason, optionally per dish (<code>menu_id</code>). <code>diet_map</code> converts dietary preference to kitchen group.</p>
                 </div>
             </div>
         </aside>

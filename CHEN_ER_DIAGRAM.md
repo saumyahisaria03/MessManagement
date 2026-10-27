@@ -1,140 +1,76 @@
 # Classical Chen's Entity-Relationship (ER) Model
 
-This document outlines the complete **Chen's ER Model** for the **Mess Management System**, adhering to standard database textbook notation (Rectangles, Diamonds, Double Shapes, Ovals, Underlines, and Dashed lines).
+Chen-notation **core model** of the **Mess Management System**. Attribute names follow `schema.sql`.
+
+> **Scope.** Diagram covers 4 strong entities + 2 weak entities. Other tables (`diet_map`, `weekly_menus`, `meal_optouts`, `meal_production`, `food_waste_log`, `guest_meals`, `mess_feedbacks`, `inventory_items`) appear only in the Mermaid ER in [`er_diagram.html`](er_diagram.html) / [`database_design.md`](database_design.md) (all 16 tables).
 
 ---
 
-## 1. Classical ER Diagram Notation Reference
+## 1. Notation Reference
 
-| Symbol | Representation | Meaning in ER Model | Application in this System |
+| Symbol | Representation | Meaning | Used here |
 | :--- | :--- | :--- | :--- |
-| **Rectangle** | `[ Entity ]` | **Strong Entity Set** | `STUDENT`, `HOSTEL`, `MESS`, `MEAL_SLOT` |
-| **Double Rectangle** | `[[ Weak Entity ]]` | **Weak Entity Set** (Existence dependent on owner) | `MESS_REBATE`, `MONTHLY_BILL` |
-| **Diamond** | `< Relationship >` | **Relationship Set** | `RESIDES_IN`, `HOUSES_MESS`, `SUBSCRIBES`, `CONSUMES` |
-| **Double Diamond** | `<< Identifying Rel >>` | **Identifying Relationship** (Connects weak entity to owner) | `APPLIES_FOR` (Rebate), `GENERATED_FOR` (Bill) |
-| **Oval with Solid Underline** | `( Key_Attr )` | **Primary Key** | `Registration_No`, `Hostel_ID`, `Mess_ID`, `Slot_ID` |
-| **Oval with Dashed Underline** | `( -Partial_Key- )` | **Partial Key / Discriminator** (For weak entities) | `Rebate_No` (in Rebate), `Billing_Month` (in Bill) |
-| **Double Oval** | `(( Multivalued ))` | **Multivalued Attribute** (Can have multiple values) | `Phone_Number` (Students can have multiple contact numbers) |
-| **Dashed Oval** | `(- Derived -)` | **Derived Attribute** (Computed dynamically from other attributes) | `Age` (from DOB), `Leave_Days` (from dates), `Net_Payable` |
-| **Branching Ovals** | `(Comp) -> (A1), (A2)` | **Composite Attribute** (Composed of sub-parts) | `Name` $\rightarrow$ `First_Name`, `Last_Name` |
-| **Double Line** | `═══════` | **Total Participation** (Every entity must participate) | Every `STUDENT` must reside in a `HOSTEL`; every `REBATE` must have a `STUDENT` |
-| **Single Line** | `───────` | **Partial Participation** | Not every student has applied for a rebate |
+| **Rectangle** | `[ Entity ]` | Strong entity | `STUDENT`, `HOSTEL`, `MESS`, `MEAL_SLOT` |
+| **Double Rectangle** | `[[ Weak Entity ]]` | Weak entity | `MESS_REBATE`, `MONTHLY_BILL` |
+| **Diamond** | `< Relationship >` | Relationship set | `RESIDES_IN`, `HOUSES_MESS`, `SUBSCRIBES`, `CONSUMES` |
+| **Double Diamond** | `<< Identifying Rel >>` | Weak entity to owner | `APPLIES_FOR`, `GENERATED_FOR` |
+| **Solid-underlined oval** | `( Key )` | Primary key | `Registration_No`, `Hostel_ID`, `Mess_ID`, `Slot_ID` |
+| **Dashed-underlined oval** | `( -Partial- )` | Partial key / discriminator | `Rebate_No`, `Billing_Month` |
+| **Dashed oval** | `(- Derived -)` | Derived attribute | `Leave_Days`, `Net_Payable` |
+| **Double oval** | `(( Multi ))` | Multivalued | *not used* (`phone_number` is single-valued in schema) |
+| **Branching ovals** | `(Comp) -> (A),(B)` | Composite | *not used* (`full_name` is single column) |
+| **Double line** | `═══` | Total participation | `STUDENT`→`RESIDES_IN`, `MESS_REBATE`→`APPLIES_FOR`, `MONTHLY_BILL`→`GENERATED_FOR` |
+| **Gold-filled oval** | | Required attribute | Registration_No, Full_Name, Room_No, Dietary_Preference |
 
 ---
 
-## 2. Textual / Structural Diagram
+## 2. Entity & Attribute Catalog
 
-```text
-                               +-----------------------------+
-                               |           HOSTEL            |
-                               +-----------------------------+
-                               /     |       |       \       \
-                       (Hostel_ID) (Name) (Block) (Gender) (Warden)
-                          [PK]
-                             \
-                              \ (1)
-                               \
-                        < RESIDES_IN >
-                               /
-                         (N)  //  [Total Participation]
-                             //
-               +-------------------------------------------------+
-               |                    STUDENT                      |
-               +-------------------------------------------------+
-               /       |        |        |        \        \      \
-       (Reg_No)      (Name)  (Room_No) (Veg/   ((Phone)) (Email)  (DOB)
-         [PK]        /    \    [Req]   NonVeg)  [Multi]             \
-               (First)    (Last)        [Req]                     (-Age-)
-                                                                  [Derived]
-                 // (1)                               \\ (1)
-                //                                     \\
-      << APPLIES_FOR >>                       << GENERATED_FOR >>
-        [Identifying]                           [Identifying]
-              // (N)                                  // (N)
-             //                                      //
-   +====================+                  +=====================+
-   |    MESS_REBATE     |                  |    MONTHLY_BILL     |
-   |   (Weak Entity)    |                  |    (Weak Entity)    |
-   +====================+                  +=====================+
-    /     |      \     \                    /      |        \     \
-(Rebate_No) (Dates) (Reason) (-Days-)   (Month) (Base_Fee) (-Rebate-) (-Net_Payable-)
- [Partial]                   [Derived]  [Partial]          [Derived]   [Derived]
-```
+### A. Strong: `STUDENT` (table `students`)
+- **`Registration_No`** → primary key (conceptual; physical PK is `student_id`, `registration_no` is `UNIQUE`).
+- `Full_Name`, `Room_No`, `Dietary_Preference` (required; `VEG`, `NON_VEG`, `JAIN`, `EGG_ONLY`; FK to `diet_map` → kitchen group `VEG` / `NON_VEG`).
+- `Email`, `Phone_Number`, `Emergency_Contact`, `Department`, `Year_of_Study`, `Account_Status` (`ACTIVE`, `INACTIVE`, `SUSPENDED`, `ALUMNI`).
+
+### B. Weak: `MESS_REBATE` (table `mess_rebates`, mess leave)
+- **Owner**: `STUDENT`. **Identifying relationship**: `APPLIES_FOR` (double diamond).
+- **`Rebate_No`** → partial key (conceptual: leave #1, #2 per student). Physical table uses surrogate `rebate_id`; `ON DELETE CASCADE` from student keeps the existence dependency.
+- `Start_Date`, `End_Date`, `Reason`, `Status` (`PENDING`, `APPROVED`, `REJECTED`, `CANCELLED`).
+- **`Leave_Days`** → derived: `End_Date − Start_Date + 1` (computed in Q3, not stored).
+
+### C. Weak: `MONTHLY_BILL` (table `monthly_bills`)
+- **Owner**: `STUDENT`; also references `MESS` (FK, part of unique key `student_id, mess_id, billing_month, billing_year`). Diagram draws only the STUDENT identifying link.
+- **Identifying relationship**: `GENERATED_FOR` (double diamond).
+- **`Billing_Month`** → partial key (with `Billing_Year`).
+- `Base_Fee`, `Rebate_Amount`, `Guest_Charges`, `Payment_Status` (`UNPAID`, `PAID`, `OVERDUE`, `WAIVED`).
+- **`Net_Payable`** → derived: `Base_Fee − Rebate_Amount + Guest_Charges + Fines_Or_Extras` (stored generated column).
+- `Rebate_Amount` is a stored snapshot (`rebate_days` × mess `per_day_rebate_rate` at billing time), **not** derived.
+
+### D. Strong: `HOSTEL` (table `hostels`)
+- **`Hostel_ID`** PK. `Hostel_Name`, `Block_Code`, `Gender_Type` (`MALE`, `FEMALE`, `COED`), `Warden_Name`, `Warden_Contact`.
+
+### E. Strong: `MESS` (table `messes`)
+- **`Mess_ID`** PK. `Mess_Name`, `Mess_Type` (`PURE_VEG`, `VEG_NON_VEG`, `SPECIAL_DIET`), `Capacity`, `Caterer_Name`, `Monthly_Base_Fee`, `Rebate_Rate_Per_Day` (`per_day_rebate_rate`).
+
+### F. Strong: `MEAL_SLOT` (table `meal_slots`)
+- **`Slot_ID`** PK. `Slot_Name` (`BREAKFAST`, `LUNCH`, `SNACKS`, `DINNER`), `Timings` (`start_time`, `end_time`), `Guest_Rate`.
 
 ---
 
-## 3. Detailed Entity & Attribute Catalog
+## 3. Relationship Sets & Cardinalities
 
-### A. Strong Entity: `STUDENT`
-*Entity possessing its own primary key.*
-- **`Registration_No`** $\rightarrow$ **Primary Key** (Solid Underline). Unique institutional identifier.
-- **`Name`** $\rightarrow$ **Composite Attribute** branching into:
-  - `First_Name`
-  - `Last_Name`
-- **`Room_No`** $\rightarrow$ Simple Attribute (Room allocation).
-- **`Veg_Non_Veg`** $\rightarrow$ Simple Attribute with domain check (`VEG`, `NON_VEG`, `JAIN`, `EGG_ONLY`).
-- **`Phone_Number`** $\rightarrow$ **Multivalued Attribute** (Double Oval): A student may register both personal and guardian contact numbers.
-- **`DOB`** $\rightarrow$ Simple Attribute (Date of Birth).
-- **`Age`** $\rightarrow$ **Derived Attribute** (Dashed Oval): Dynamically calculated as $\text{Current\_Date} - \text{DOB}$.
-- **`Email`**, **`Department`**, **`Year_of_Study`** $\rightarrow$ Simple attributes.
-
-### B. Weak Entity: `MESS_REBATE` (Mess Leaves)
-*Cannot exist without an associated `STUDENT`.*
-- **Owner Entity**: `STUDENT`
-- **Identifying Relationship**: `APPLIES_FOR` (**Double Diamond**)
-- **`Rebate_No`** $\rightarrow$ **Partial Key / Discriminator** (Dashed Underline): Numbered relative to the student (e.g. Leave #1, Leave #2).
-- **`Start_Date`**, **`End_Date`** $\rightarrow$ Date bounds.
-- **`Reason`**, **`Status`** $\rightarrow$ Text and ENUM (`PENDING`, `APPROVED`, `REJECTED`).
-- **`Leave_Days`** $\rightarrow$ **Derived Attribute** (Dashed Oval): $\text{End\_Date} - \text{Start\_Date} + 1$.
-
-### C. Weak Entity: `MONTHLY_BILL`
-*Generated monthly per student; existence dependent on `STUDENT` and `MESS`.*
-- **Owner Entities**: `STUDENT` & `MESS`
-- **Identifying Relationship**: `GENERATED_FOR` (**Double Diamond**)
-- **`Billing_Month`** $\rightarrow$ **Partial Key / Discriminator** (Dashed Underline): Month and year cycle.
-- **`Base_Fee`** $\rightarrow$ Regular monthly mess rate.
-- **`Rebate_Discount`** $\rightarrow$ **Derived Attribute** (Dashed Oval): $\text{Leave\_Days} \times \text{Daily\_Rebate\_Rate}$.
-- **`Net_Payable`** $\rightarrow$ **Derived Attribute** (Dashed Oval): $\text{Base\_Fee} - \text{Rebate\_Discount} + \text{Guest\_Charges}$.
-- **`Payment_Status`** $\rightarrow$ `PAID`, `UNPAID`, `OVERDUE`.
-
-### D. Strong Entity: `HOSTEL`
-- **`Hostel_ID`** $\rightarrow$ **Primary Key** (Solid Underline).
-- `Hostel_Name`, `Block_Code`, `Gender_Type`, `Warden_Name`, `Warden_Contact`.
-
-### E. Strong Entity: `MESS`
-- **`Mess_ID`** $\rightarrow$ **Primary Key** (Solid Underline).
-- `Mess_Name`, `Mess_Type` (`PURE_VEG`, `VEG_NON_VEG`), `Capacity`, `Caterer_Name`, `Monthly_Base_Fee`, `Rebate_Rate_Per_Day`.
-
-### F. Strong Entity: `MEAL_SLOT`
-- **`Slot_ID`** $\rightarrow$ **Primary Key** (Solid Underline).
-- `Slot_Name` (`BREAKFAST`, `LUNCH`, `SNACKS`, `DINNER`), `Start_Time`, `End_Time`, `Guest_Rate`.
+1. **`RESIDES_IN`** (`STUDENT` – `HOSTEL`): N : 1, total for `STUDENT` (`students.hostel_id NOT NULL`).
+2. **`HOUSES_MESS`** (`HOSTEL` – `MESS`): 1 : N, partial (`messes.hostel_id` nullable).
+3. **`SUBSCRIBES`** (`STUDENT` – `MESS`): M : N over time, via `student_mess_subscriptions`. Attributes: `Status`, `Plan_Type` (`MONTHLY`, `SEMESTER`, `ANNUAL`), `Start_Date`, `End_Date`. Rule: at most **one ACTIVE** subscription per student (`uq_one_active_sub`).
+4. **`CONSUMES`** (ternary `STUDENT` – `MESS` – `MEAL_SLOT`): M : N : P, via `meal_attendance` (unique per student + slot + date). Attributes: `Swipe_Timestamp` (`scanned_at`), `Diet_Served`.
+5. **`APPLIES_FOR`** (identifying): `STUDENT` 1 : N `MESS_REBATE`, total on weak side.
+6. **`GENERATED_FOR`** (identifying): `STUDENT` 1 : N `MONTHLY_BILL`, total on weak side.
 
 ---
 
-## 4. Relationship Sets & Cardinalities
+## 4. Files
 
-1. **`RESIDES_IN`** (Relationship between `STUDENT` and `HOSTEL`):
-   - **Cardinality**: $N : 1$ (Many students reside in one hostel).
-   - **Participation**: **Total** for `STUDENT` (**Double Line** — Every student must be assigned a hostel).
-2. **`SUBSCRIBES`** (Relationship between `STUDENT` and `MESS`):
-   - **Cardinality**: $M : N$ (Students enroll in mess plans across terms).
-   - **Relationship Attributes**: `Start_Date`, `End_Date`, `Plan_Type`.
-3. **`CONSUMES`** (Ternary Relationship between `STUDENT`, `MESS`, `MEAL_SLOT`):
-   - **Cardinality**: $M : N : P$.
-   - **Relationship Attributes**: `Swipe_Timestamp`, `Diet_Served` (Veg / Non-Veg verification).
-4. **`HOUSES_MESS`** (Relationship between `HOSTEL` and `MESS`):
-   - **Cardinality**: $1 : N$.
-5. **`APPLIES_FOR`** (**Identifying Relationship**):
-   - Connects `STUDENT` (Owner) with `MESS_REBATE` (Weak Entity).
-   - **Double Diamond** with Total Participation from `MESS_REBATE`.
-6. **`GENERATED_FOR`** (**Identifying Relationship**):
-   - Connects `STUDENT` / `MESS` with `MONTHLY_BILL` (Weak Entity).
-   - **Double Diamond** with Total Participation from `MONTHLY_BILL`.
-
----
-
-## 5. Direct Files Available in `d:\Prj`
-
-- [`chen_er_diagram.svg`](file:///d:/Prj/chen_er_diagram.svg): Raw Scalable Vector Graphic with all classical shapes, colored outlines, double borders, and text labels.
-- [`chen_er_diagram.html`](file:///d:/Prj/chen_er_diagram.html): Interactive viewer with pan and zoom controls.
-- [`schema.sql`](file:///d:/Prj/schema.sql): Relational DDL implementation enforcing all foreign keys and constraints.
+- [`generate_chen_svg.py`](generate_chen_svg.py): generator. Edit model in `build()`, run `python generate_chen_svg.py`.
+- [`chen_er_diagram.svg`](chen_er_diagram.svg): generated diagram.
+- [`chen_er_diagram.html`](chen_er_diagram.html): pan/zoom viewer (serve over HTTP: `python -m http.server`).
+- [`er_diagram.html`](er_diagram.html): Mermaid ER, all 16 tables.
+- [`schema.sql`](schema.sql): DDL, source of truth.
