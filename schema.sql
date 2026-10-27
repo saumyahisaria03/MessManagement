@@ -2,15 +2,14 @@
 -- MESS MANAGEMENT SYSTEM - DATABASE SCHEMA (MySQL 8.0.16+ / MySQL Workbench)
 -- File: schema.sql
 -- Run this file FIRST, then seed_data.sql, then queries.sql.
+-- WARNING: DROPS and recreates the whole `mess_management` database.
 -- ============================================================================
 
 DROP DATABASE IF EXISTS mess_management;
-CREATE DATABASE mess_management CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+CREATE DATABASE mess_management CHARACTER SET utf8mb4;   -- server-default utf8mb4 collation (works on MySQL 5.7+/8.x)
 USE mess_management;
 
--- ============================================================================
 -- 1. HOSTELS
--- ============================================================================
 CREATE TABLE hostels (
     hostel_id INT PRIMARY KEY AUTO_INCREMENT,
     hostel_name VARCHAR(50) NOT NULL UNIQUE,
@@ -22,9 +21,7 @@ CREATE TABLE hostels (
     CONSTRAINT chk_hostel_gender CHECK (gender_type IN ('MALE', 'FEMALE', 'COED'))
 ) ENGINE=InnoDB;
 
--- ============================================================================
 -- 2. MESSES
--- ============================================================================
 CREATE TABLE messes (
     mess_id INT PRIMARY KEY AUTO_INCREMENT,
     mess_name VARCHAR(100) NOT NULL UNIQUE,
@@ -45,9 +42,7 @@ CREATE TABLE messes (
     CONSTRAINT chk_mess_status CHECK (status IN ('ACTIVE', 'UNDER_MAINTENANCE', 'CLOSED'))
 ) ENGINE=InnoDB;
 
--- ============================================================================
 -- 3. STUDENTS (Name, Registration No, Room No, Veg/Non-Veg preference)
--- ============================================================================
 CREATE TABLE students (
     student_id INT PRIMARY KEY AUTO_INCREMENT,
     registration_no VARCHAR(20) NOT NULL UNIQUE,
@@ -69,9 +64,7 @@ CREATE TABLE students (
     CONSTRAINT chk_student_status CHECK (account_status IN ('ACTIVE', 'INACTIVE', 'SUSPENDED', 'ALUMNI'))
 ) ENGINE=InnoDB;
 
--- ============================================================================
 -- 4. MEAL SLOTS
--- ============================================================================
 CREATE TABLE meal_slots (
     slot_id INT PRIMARY KEY AUTO_INCREMENT,
     slot_name VARCHAR(20) NOT NULL UNIQUE,
@@ -79,12 +72,15 @@ CREATE TABLE meal_slots (
     end_time TIME NOT NULL,
     guest_rate DECIMAL(8, 2) NOT NULL,
     CONSTRAINT chk_slot_name CHECK (slot_name IN ('BREAKFAST', 'LUNCH', 'SNACKS', 'DINNER')),
-    CONSTRAINT chk_slot_rate CHECK (guest_rate > 0)
+    CONSTRAINT chk_slot_rate CHECK (guest_rate > 0),
+    CONSTRAINT chk_slot_times CHECK (end_time > start_time)
 ) ENGINE=InnoDB;
 
--- ============================================================================
 -- 5. STUDENT MESS SUBSCRIPTIONS
--- ============================================================================
+-- active_student_id is NULL unless status = 'ACTIVE'; its UNIQUE index therefore allows
+-- at most ONE active subscription per student (MySQL has no partial unique index).
+-- fk_sub_student is RESTRICT because MySQL forbids CASCADE on the base column of a
+-- stored generated column; mark leavers ALUMNI/INACTIVE instead of deleting them.
 CREATE TABLE student_mess_subscriptions (
     subscription_id INT PRIMARY KEY AUTO_INCREMENT,
     student_id INT NOT NULL,
@@ -94,16 +90,16 @@ CREATE TABLE student_mess_subscriptions (
     plan_type VARCHAR(20) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_sub_student FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
+    active_student_id INT GENERATED ALWAYS AS (CASE WHEN status = 'ACTIVE' THEN student_id ELSE NULL END) STORED,
+    CONSTRAINT fk_sub_student FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE RESTRICT,
     CONSTRAINT fk_sub_mess FOREIGN KEY (mess_id) REFERENCES messes(mess_id) ON DELETE RESTRICT,
     CONSTRAINT chk_sub_plan CHECK (plan_type IN ('MONTHLY', 'SEMESTER', 'ANNUAL')),
     CONSTRAINT chk_sub_status CHECK (status IN ('ACTIVE', 'EXPIRED', 'TRANSFERRED', 'CANCELLED')),
-    CONSTRAINT chk_sub_dates CHECK (end_date >= start_date)
+    CONSTRAINT chk_sub_dates CHECK (end_date >= start_date),
+    CONSTRAINT uq_one_active_sub UNIQUE (active_student_id)
 ) ENGINE=InnoDB;
 
--- ============================================================================
--- 6. WEEKLY MENUS
--- ============================================================================
+-- 6. WEEKLY MENUS (menu_items is a free-text, comma-separated display string, not a queryable list)
 CREATE TABLE weekly_menus (
     menu_id INT PRIMARY KEY AUTO_INCREMENT,
     mess_id INT NOT NULL,
@@ -119,9 +115,7 @@ CREATE TABLE weekly_menus (
     CONSTRAINT uq_menu UNIQUE (mess_id, day_of_week, slot_id, diet_category)
 ) ENGINE=InnoDB;
 
--- ============================================================================
 -- 7. MEAL ATTENDANCE
--- ============================================================================
 CREATE TABLE meal_attendance (
     attendance_id INT PRIMARY KEY AUTO_INCREMENT,
     student_id INT NOT NULL,
@@ -139,9 +133,7 @@ CREATE TABLE meal_attendance (
     CONSTRAINT uq_att UNIQUE (student_id, slot_id, attendance_date)
 ) ENGINE=InnoDB;
 
--- ============================================================================
 -- 8. MESS REBATES
--- ============================================================================
 CREATE TABLE mess_rebates (
     rebate_id INT PRIMARY KEY AUTO_INCREMENT,
     student_id INT NOT NULL,
@@ -157,9 +149,10 @@ CREATE TABLE mess_rebates (
     CONSTRAINT chk_rebate_dates CHECK (end_date >= start_date)
 ) ENGINE=InnoDB;
 
--- ============================================================================
 -- 9. MONTHLY BILLS
--- ============================================================================
+-- net_payable is a STORED GENERATED column, so it can never drift from its components.
+-- rebate_amount stays a stored snapshot (rebate_days x the mess rate AT BILLING TIME).
+-- Uniqueness includes mess_id so a mid-month mess transfer can produce two bills.
 CREATE TABLE monthly_bills (
     bill_id INT PRIMARY KEY AUTO_INCREMENT,
     student_id INT NOT NULL,
@@ -167,11 +160,11 @@ CREATE TABLE monthly_bills (
     billing_month INT NOT NULL,
     billing_year INT NOT NULL,
     base_fee DECIMAL(10, 2) NOT NULL,
-    rebate_days INT DEFAULT 0,
-    rebate_amount DECIMAL(10, 2) DEFAULT 0.00,
-    guest_charges DECIMAL(10, 2) DEFAULT 0.00,
-    fines_or_extras DECIMAL(10, 2) DEFAULT 0.00,
-    net_payable DECIMAL(10, 2) NOT NULL,
+    rebate_days INT NOT NULL DEFAULT 0,
+    rebate_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    guest_charges DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    fines_or_extras DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    net_payable DECIMAL(10, 2) GENERATED ALWAYS AS (base_fee - rebate_amount + guest_charges + fines_or_extras) STORED,
     payment_status VARCHAR(15) NOT NULL DEFAULT 'UNPAID',
     due_date DATE NOT NULL,
     paid_at DATETIME NULL,
@@ -183,17 +176,14 @@ CREATE TABLE monthly_bills (
     CONSTRAINT chk_bill_year CHECK (billing_year >= 2020),
     CONSTRAINT chk_bill_base CHECK (base_fee >= 0),
     CONSTRAINT chk_bill_rebate_days CHECK (rebate_days >= 0),
-    CONSTRAINT chk_bill_rebate_amt CHECK (rebate_amount >= 0),
+    CONSTRAINT chk_bill_rebate_amt CHECK (rebate_amount >= 0 AND rebate_amount <= base_fee),
     CONSTRAINT chk_bill_guest CHECK (guest_charges >= 0),
     CONSTRAINT chk_bill_fines CHECK (fines_or_extras >= 0),
-    CONSTRAINT chk_bill_net CHECK (net_payable >= 0),
     CONSTRAINT chk_bill_status CHECK (payment_status IN ('UNPAID', 'PAID', 'OVERDUE', 'WAIVED')),
-    CONSTRAINT uq_bill UNIQUE (student_id, billing_month, billing_year)
+    CONSTRAINT uq_bill UNIQUE (student_id, mess_id, billing_month, billing_year)
 ) ENGINE=InnoDB;
 
--- ============================================================================
--- 10. GUEST MEALS
--- ============================================================================
+-- 10. GUEST MEALS (total_charge is a snapshot of guest_count x guest_rate at booking time)
 CREATE TABLE guest_meals (
     guest_meal_id INT PRIMARY KEY AUTO_INCREMENT,
     host_student_id INT NOT NULL,
@@ -214,9 +204,7 @@ CREATE TABLE guest_meals (
     CONSTRAINT chk_guest_status CHECK (status IN ('BOOKED', 'CONSUMED', 'CANCELLED'))
 ) ENGINE=InnoDB;
 
--- ============================================================================
 -- 11. MESS FEEDBACKS
--- ============================================================================
 CREATE TABLE mess_feedbacks (
     feedback_id INT PRIMARY KEY AUTO_INCREMENT,
     student_id INT NOT NULL,
@@ -236,9 +224,7 @@ CREATE TABLE mess_feedbacks (
     CONSTRAINT chk_fb_status CHECK (status IN ('OPEN', 'UNDER_REVIEW', 'RESOLVED'))
 ) ENGINE=InnoDB;
 
--- ============================================================================
 -- 12. INVENTORY ITEMS
--- ============================================================================
 CREATE TABLE inventory_items (
     item_id INT PRIMARY KEY AUTO_INCREMENT,
     mess_id INT NOT NULL,
@@ -256,9 +242,7 @@ CREATE TABLE inventory_items (
     CONSTRAINT uq_inv UNIQUE (mess_id, item_name)
 ) ENGINE=InnoDB;
 
--- ============================================================================
 -- INDEXES (registration_no / email / names are already indexed via UNIQUE)
--- ============================================================================
 CREATE INDEX idx_students_hostel_room ON students(hostel_id, room_no);
 CREATE INDEX idx_students_diet ON students(dietary_preference);
 CREATE INDEX idx_attendance_date_slot ON meal_attendance(attendance_date, slot_id);
@@ -267,27 +251,13 @@ CREATE INDEX idx_rebates_dates ON mess_rebates(start_date, end_date, status);
 CREATE INDEX idx_bills_payment_status ON monthly_bills(payment_status);
 CREATE INDEX idx_feedback_mess_rating ON mess_feedbacks(mess_id, rating);
 
--- ============================================================================
 -- VIEWS
--- ============================================================================
 CREATE VIEW v_active_student_directory AS
 SELECT
-    s.student_id,
-    s.registration_no,
-    s.full_name,
-    h.hostel_name,
-    h.block_code,
-    s.room_no,
-    s.dietary_preference,
-    s.email,
-    s.phone_number,
-    s.department,
-    s.year_of_study,
-    m.mess_id,
-    m.mess_name,
-    sub.plan_type,
-    sub.start_date AS subscription_start,
-    sub.end_date AS subscription_end
+    s.student_id, s.registration_no, s.full_name, h.hostel_name, h.block_code, s.room_no,
+    s.dietary_preference, s.email, s.phone_number, s.department, s.year_of_study,
+    m.mess_id, m.mess_name, sub.plan_type,
+    sub.start_date AS subscription_start, sub.end_date AS subscription_end
 FROM students s
 JOIN hostels h ON s.hostel_id = h.hostel_id
 LEFT JOIN student_mess_subscriptions sub ON s.student_id = sub.student_id AND sub.status = 'ACTIVE'
@@ -296,23 +266,11 @@ WHERE s.account_status = 'ACTIVE';
 
 CREATE VIEW v_student_billing_summary AS
 SELECT
-    b.bill_id,
-    s.registration_no,
-    s.full_name,
+    b.bill_id, s.registration_no, s.full_name,
     CONCAT(h.block_code, '-', s.room_no) AS room_identifier,
-    m.mess_name,
-    b.billing_month,
-    b.billing_year,
-    b.base_fee,
-    b.rebate_days,
-    b.rebate_amount,
-    b.guest_charges,
-    b.fines_or_extras,
-    b.net_payable,
-    b.payment_status,
-    b.due_date,
-    b.paid_at,
-    b.transaction_reference
+    m.mess_name, b.billing_month, b.billing_year, b.base_fee, b.rebate_days, b.rebate_amount,
+    b.guest_charges, b.fines_or_extras, b.net_payable, b.payment_status, b.due_date,
+    b.paid_at, b.transaction_reference
 FROM monthly_bills b
 JOIN students s ON b.student_id = s.student_id
 JOIN hostels h ON s.hostel_id = h.hostel_id
@@ -320,9 +278,7 @@ JOIN messes m ON b.mess_id = m.mess_id;
 
 CREATE VIEW v_mess_ratings_summary AS
 SELECT
-    m.mess_id,
-    m.mess_name,
-    m.mess_type,
+    m.mess_id, m.mess_name, m.mess_type,
     COUNT(f.feedback_id) AS total_feedbacks,
     ROUND(AVG(f.rating), 2) AS average_rating,
     SUM(CASE WHEN f.rating >= 4 THEN 1 ELSE 0 END) AS positive_reviews_count,

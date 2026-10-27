@@ -1,9 +1,13 @@
 -- ============================================================================
 -- MESS MANAGEMENT SYSTEM BUSINESS & ANALYTICAL QUERIES (MySQL)
 -- Run AFTER schema.sql and seed_data.sql
--- In Workbench: place the cursor inside a query and press Ctrl+Enter to run it.
+-- In Workbench: run the two SET lines first (same session), then place the cursor
+-- inside a query and press Ctrl+Enter.
+-- Parameters (override to look at another day / billing cycle):
 -- ============================================================================
 USE mess_management;
+SET @on_date = CURDATE();
+SET @bill_month = 9, @bill_year = 2026;   -- the seeded billing cycle
 
 -- QUERY 1: Student Profile Lookup by Registration Number
 SELECT
@@ -23,7 +27,7 @@ FROM students s
 JOIN hostels h ON s.hostel_id = h.hostel_id
 LEFT JOIN student_mess_subscriptions sub ON s.student_id = sub.student_id AND sub.status = 'ACTIVE'
 LEFT JOIN messes m ON sub.mess_id = m.mess_id
-WHERE s.registration_no = '2023BCSE0101';
+WHERE s.registration_no = '2025BCSE0101';
 
 -- QUERY 2: Kitchen Headcount Demand Forecast (excludes approved leaves)
 SELECT
@@ -34,12 +38,13 @@ FROM student_mess_subscriptions sub
 JOIN messes m ON sub.mess_id = m.mess_id
 JOIN students s ON sub.student_id = s.student_id
 WHERE sub.status = 'ACTIVE'
+  AND @on_date BETWEEN sub.start_date AND sub.end_date
   AND s.account_status = 'ACTIVE'
   AND s.student_id NOT IN (
       SELECT student_id
       FROM mess_rebates
       WHERE status = 'APPROVED'
-        AND '2026-10-13' BETWEEN start_date AND end_date
+        AND @on_date BETWEEN start_date AND end_date
   )
 GROUP BY m.mess_name, s.dietary_preference
 ORDER BY m.mess_name, s.dietary_preference;
@@ -60,9 +65,9 @@ FROM mess_rebates r
 JOIN students s ON r.student_id = s.student_id
 JOIN hostels h ON s.hostel_id = h.hostel_id
 WHERE r.status = 'APPROVED'
-  AND '2026-10-13' BETWEEN r.start_date AND r.end_date;
+  AND @on_date BETWEEN r.start_date AND r.end_date;
 
--- QUERY 4: Monthly Mess Bill Statement (September 2026)
+-- QUERY 4: Monthly Mess Bill Statement (cycle set by @bill_month / @bill_year)
 SELECT
     b.bill_id,
     s.registration_no,
@@ -84,10 +89,10 @@ FROM monthly_bills b
 JOIN students s ON b.student_id = s.student_id
 JOIN hostels h ON s.hostel_id = h.hostel_id
 JOIN messes m ON b.mess_id = m.mess_id
-WHERE b.billing_month = 9 AND b.billing_year = 2026
+WHERE b.billing_month = @bill_month AND b.billing_year = @bill_year
 ORDER BY b.net_payable DESC;
 
--- QUERY 5: Fee Defaulter / Overdue Payment Tracking
+-- QUERY 5: Fee Defaulter / Overdue Payment Tracking (status OR past due date, so no manual flip is needed)
 SELECT
     s.registration_no,
     s.full_name,
@@ -98,15 +103,17 @@ SELECT
     b.billing_month,
     b.billing_year,
     b.net_payable AS outstanding_amount,
-    b.due_date
+    b.due_date,
+    DATEDIFF(CURDATE(), b.due_date) AS days_overdue
 FROM monthly_bills b
 JOIN students s ON b.student_id = s.student_id
 JOIN hostels h ON s.hostel_id = h.hostel_id
 JOIN messes m ON b.mess_id = m.mess_id
 WHERE b.payment_status = 'OVERDUE'
+   OR (b.payment_status = 'UNPAID' AND b.due_date < CURDATE())
 ORDER BY b.net_payable DESC;
 
--- QUERY 6: Meal Attendance Log for Lunch on 2026-10-13
+-- QUERY 6: Meal Attendance Log for Lunch on @on_date
 SELECT
     a.attendance_id,
     s.registration_no,
@@ -122,7 +129,7 @@ JOIN students s ON a.student_id = s.student_id
 JOIN hostels h ON s.hostel_id = h.hostel_id
 JOIN messes m ON a.mess_id = m.mess_id
 JOIN meal_slots ms ON a.slot_id = ms.slot_id
-WHERE a.attendance_date = '2026-10-13' AND ms.slot_name = 'LUNCH'
+WHERE a.attendance_date = @on_date AND ms.slot_name = 'LUNCH'
 ORDER BY a.scanned_at ASC;
 
 -- QUERY 7: Weekly Menu Schedule for Monday (Mess 1)
@@ -192,7 +199,7 @@ JOIN messes m ON gm.mess_id = m.mess_id
 WHERE gm.status = 'CONSUMED'
 GROUP BY m.mess_name, gm.diet_preference;
 
--- QUERY 12: Absenteeism / Meal Skip Detection (Central Mess lunch, 2026-10-13)
+-- QUERY 12: Absenteeism / Meal Skip Detection (Central Mess lunch on @on_date)
 SELECT
     s.registration_no,
     s.full_name,
@@ -203,11 +210,13 @@ JOIN students s ON sub.student_id = s.student_id
 JOIN hostels h ON s.hostel_id = h.hostel_id
 WHERE sub.mess_id = 1
   AND sub.status = 'ACTIVE'
+  AND @on_date BETWEEN sub.start_date AND sub.end_date
   AND s.student_id NOT IN (
       SELECT student_id FROM mess_rebates
-      WHERE status = 'APPROVED' AND '2026-10-13' BETWEEN start_date AND end_date
+      WHERE status = 'APPROVED' AND @on_date BETWEEN start_date AND end_date
   )
   AND s.student_id NOT IN (
-      SELECT student_id FROM meal_attendance
-      WHERE attendance_date = '2026-10-13' AND slot_id = 2
+      SELECT a.student_id FROM meal_attendance a
+      JOIN meal_slots ms ON a.slot_id = ms.slot_id
+      WHERE a.attendance_date = @on_date AND ms.slot_name = 'LUNCH'
   );

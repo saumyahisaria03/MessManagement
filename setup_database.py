@@ -5,7 +5,8 @@ and runs verification queries.
 
 Requires:  pip install mysql-connector-python
 Usage:     set MYSQL_PASSWORD=yourpassword   (PowerShell: $env:MYSQL_PASSWORD="...")
-           python setup_database.py
+           python setup_database.py            # asks before wiping an existing database
+           python setup_database.py --force    # no prompt (CI / scripted use)
 """
 import os
 import sys
@@ -19,10 +20,26 @@ def run_script(cursor, filename):
             cursor.execute(stmt)
 
 
-def init_database():
+def confirm_wipe(cursor, force):
+    """schema.sql begins with DROP DATABASE, so never run it blindly over existing data."""
+    cursor.execute("SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name = %s", (DB_NAME,))
+    if not cursor.fetchone()[0]:
+        return
+    cursor.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = %s", (DB_NAME,))
+    n_tables = cursor.fetchone()[0]
+    print(f"[!] Database `{DB_NAME}` already exists ({n_tables} tables). schema.sql will DROP it.")
+    if force:
+        return
+    if not sys.stdin.isatty() or input("    Type the database name to confirm: ").strip() != DB_NAME:
+        print("[ABORT] Nothing changed. Re-run with --force to skip this prompt.")
+        sys.exit(2)
+
+
+def init_database(force=False):
     print(f"[*] Connecting to MySQL at {MYSQL_CONFIG['host']}:{MYSQL_CONFIG['port']} as {MYSQL_CONFIG['user']}")
     conn = mysql.connector.connect(**MYSQL_CONFIG)
     cursor = conn.cursor()
+    confirm_wipe(cursor, force)
     print("[*] Executing schema.sql (recreates database)...")
     run_script(cursor, "schema.sql")
     print("[*] Executing seed_data.sql...")
@@ -68,9 +85,10 @@ def run_verifications(conn):
         JOIN messes m ON sub.mess_id = m.mess_id
         JOIN students s ON sub.student_id = s.student_id
         WHERE sub.status = 'ACTIVE'
+          AND CURDATE() BETWEEN sub.start_date AND sub.end_date
           AND s.student_id NOT IN (
               SELECT student_id FROM mess_rebates
-              WHERE status = 'APPROVED' AND '2026-10-13' BETWEEN start_date AND end_date)
+              WHERE status = 'APPROVED' AND CURDATE() BETWEEN start_date AND end_date)
         GROUP BY m.mess_name, s.dietary_preference
         ORDER BY m.mess_name, s.dietary_preference""")
     print_table("Daily Kitchen Meal Demand Forecast (Excluding Active Leaves)",
@@ -79,7 +97,7 @@ def run_verifications(conn):
     cur.execute("""
         SELECT s.registration_no, s.full_name, r.start_date, r.end_date, r.reason, r.status
         FROM mess_rebates r JOIN students s ON r.student_id = s.student_id
-        WHERE r.status = 'APPROVED' AND '2026-10-13' BETWEEN r.start_date AND r.end_date""")
+        WHERE r.status = 'APPROVED' AND CURDATE() BETWEEN r.start_date AND r.end_date""")
     print_table("Approved Mess Rebates / Leaves Active Today",
                 ["Reg No", "Student Name", "Start Date", "End Date", "Reason", "Status"], cur.fetchall())
 
@@ -107,7 +125,7 @@ def run_verifications(conn):
 
 if __name__ == "__main__":
     try:
-        connection = init_database()
+        connection = init_database(force="--force" in sys.argv)
         run_verifications(connection)
         connection.close()
     except mysql.connector.Error as e:
