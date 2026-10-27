@@ -27,6 +27,13 @@ INSERT INTO meal_slots (slot_id, slot_name, start_time, end_time, guest_rate) VA
 (3, 'SNACKS', '17:00:00', '18:15:00', 35.00),
 (4, 'DINNER', '19:30:00', '21:45:00', 95.00);
 
+-- 3a. Diet map
+INSERT INTO diet_map (dietary_preference, kitchen_group) VALUES
+('VEG', 'VEG'),
+('JAIN', 'VEG'),
+('NON_VEG', 'NON_VEG'),
+('EGG_ONLY', 'NON_VEG');
+
 -- 4. Students (registration year = 2026 - year_of_study + 1)
 INSERT INTO students (student_id, registration_no, full_name, hostel_id, room_no, dietary_preference, email, phone_number, department, year_of_study, emergency_contact, blood_group, account_status) VALUES
 (1, '2025BCSE0101', 'Aarav Sharma', 1, 'B-204', 'NON_VEG', 'aarav.sharma@univ.edu', '+91-9811122331', 'Computer Science & Engineering', 2, '+91-9911122331', 'B+', 'ACTIVE'),

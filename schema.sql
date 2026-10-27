@@ -42,6 +42,13 @@ CREATE TABLE messes (
     CONSTRAINT chk_mess_status CHECK (status IN ('ACTIVE', 'UNDER_MAINTENANCE', 'CLOSED'))
 ) ENGINE=InnoDB;
 
+-- 2a. DIET MAP (single source: raw dietary_preference -> kitchen cooking group)
+CREATE TABLE diet_map (
+    dietary_preference VARCHAR(15) PRIMARY KEY,
+    kitchen_group VARCHAR(10) NOT NULL,
+    CONSTRAINT chk_dm_group CHECK (kitchen_group IN ('VEG', 'NON_VEG'))
+) ENGINE=InnoDB;
+
 -- 3. STUDENTS (Name, Registration No, Room No, Veg/Non-Veg preference)
 CREATE TABLE students (
     student_id INT PRIMARY KEY AUTO_INCREMENT,
@@ -59,7 +66,7 @@ CREATE TABLE students (
     account_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     registered_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_students_hostel FOREIGN KEY (hostel_id) REFERENCES hostels(hostel_id) ON DELETE RESTRICT,
-    CONSTRAINT chk_student_diet CHECK (dietary_preference IN ('VEG', 'NON_VEG', 'JAIN', 'EGG_ONLY')),
+    CONSTRAINT fk_students_diet FOREIGN KEY (dietary_preference) REFERENCES diet_map(dietary_preference) ON DELETE RESTRICT,
     CONSTRAINT chk_student_year CHECK (year_of_study BETWEEN 1 AND 5),
     CONSTRAINT chk_student_status CHECK (account_status IN ('ACTIVE', 'INACTIVE', 'SUSPENDED', 'ALUMNI'))
 ) ENGINE=InnoDB;
@@ -366,3 +373,17 @@ JOIN meal_slots ms ON p.slot_id = ms.slot_id
 LEFT JOIN food_waste_log w ON w.production_id = p.production_id
 GROUP BY p.production_id, m.mess_name, p.production_date, ms.slot_name,
          p.diet_category, p.planned_headcount, p.prepared_kg, p.cost_per_kg;
+
+-- Base eligibility: active student + active subscription + kitchen group.
+-- Date, leave and opt-out filters stay in the query (views take no parameters).
+CREATE VIEW v_eligible_diners AS
+SELECT
+    s.student_id, s.registration_no, s.full_name, s.dietary_preference,
+    dm.kitchen_group,
+    CONCAT(h.block_code, '-', s.room_no) AS room,
+    sub.mess_id, sub.start_date, sub.end_date
+FROM students s
+JOIN hostels h ON s.hostel_id = h.hostel_id
+JOIN diet_map dm ON dm.dietary_preference = s.dietary_preference
+JOIN student_mess_subscriptions sub ON sub.student_id = s.student_id AND sub.status = 'ACTIVE'
+WHERE s.account_status = 'ACTIVE';

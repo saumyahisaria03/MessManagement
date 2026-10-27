@@ -7,7 +7,10 @@
 -- ============================================================================
 USE mess_management;
 SET @on_date = CURDATE();
-SET @bill_month = 9, @bill_year = 2026;   -- the seeded billing cycle
+SET @slot_id = 2, @mess_id = 1;                                    -- Q2 / Q12: meal + mess to look at
+SET @bill_month = 9, @bill_year = 2026;                            -- seeded billing cycle (step 5 fixes)
+SET @target_date = CURDATE() + INTERVAL 1 DAY, @target_slot = 2;   -- Q16: meal to plan
+SET @default_kg_per_head = 0.35;                                   -- Q16: fallback, no history anywhere
 
 -- QUERY 1: Student Profile Lookup by Registration Number
 SELECT
@@ -29,25 +32,22 @@ LEFT JOIN student_mess_subscriptions sub ON s.student_id = sub.student_id AND su
 LEFT JOIN messes m ON sub.mess_id = m.mess_id
 WHERE s.registration_no = '2025BCSE0101';
 
--- QUERY 2: Kitchen Headcount Demand Forecast (excludes approved leaves)
+-- QUERY 2: Kitchen Headcount Demand Forecast (@on_date, @slot_id; excludes leaves and opt-outs)
 SELECT
     m.mess_name,
-    s.dietary_preference,
-    COUNT(s.student_id) AS expected_headcount
-FROM student_mess_subscriptions sub
-JOIN messes m ON sub.mess_id = m.mess_id
-JOIN students s ON sub.student_id = s.student_id
-WHERE sub.status = 'ACTIVE'
-  AND @on_date BETWEEN sub.start_date AND sub.end_date
-  AND s.account_status = 'ACTIVE'
-  AND s.student_id NOT IN (
-      SELECT student_id
-      FROM mess_rebates
-      WHERE status = 'APPROVED'
-        AND @on_date BETWEEN start_date AND end_date
-  )
-GROUP BY m.mess_name, s.dietary_preference
-ORDER BY m.mess_name, s.dietary_preference;
+    d.kitchen_group,
+    COUNT(*) AS expected_headcount
+FROM v_eligible_diners d
+JOIN messes m ON m.mess_id = d.mess_id
+WHERE @on_date BETWEEN d.start_date AND d.end_date
+  AND NOT EXISTS (SELECT 1 FROM mess_rebates r
+                  WHERE r.student_id = d.student_id AND r.status = 'APPROVED'
+                    AND @on_date BETWEEN r.start_date AND r.end_date)
+  AND NOT EXISTS (SELECT 1 FROM meal_optouts o
+                  WHERE o.student_id = d.student_id
+                    AND o.meal_date = @on_date AND o.slot_id = @slot_id)
+GROUP BY m.mess_name, d.kitchen_group
+ORDER BY m.mess_name, d.kitchen_group;
 
 -- QUERY 3: Active Students on Approved Mess Rebate / Leave Today
 SELECT
@@ -199,27 +199,24 @@ JOIN messes m ON gm.mess_id = m.mess_id
 WHERE gm.status = 'CONSUMED'
 GROUP BY m.mess_name, gm.diet_preference;
 
--- QUERY 12: Absenteeism / Meal Skip Detection (Central Mess lunch on @on_date)
+-- QUERY 12: Absenteeism / Meal Skip Detection (@mess_id, @slot_id on @on_date)
 SELECT
-    s.registration_no,
-    s.full_name,
-    CONCAT(h.block_code, '-', s.room_no) AS room,
-    s.dietary_preference
-FROM student_mess_subscriptions sub
-JOIN students s ON sub.student_id = s.student_id
-JOIN hostels h ON s.hostel_id = h.hostel_id
-WHERE sub.mess_id = 1
-  AND sub.status = 'ACTIVE'
-  AND @on_date BETWEEN sub.start_date AND sub.end_date
-  AND s.student_id NOT IN (
-      SELECT student_id FROM mess_rebates
-      WHERE status = 'APPROVED' AND @on_date BETWEEN start_date AND end_date
-  )
-  AND s.student_id NOT IN (
-      SELECT a.student_id FROM meal_attendance a
-      JOIN meal_slots ms ON a.slot_id = ms.slot_id
-      WHERE a.attendance_date = @on_date AND ms.slot_name = 'LUNCH'
-  );
+    d.registration_no,
+    d.full_name,
+    d.room,
+    d.dietary_preference
+FROM v_eligible_diners d
+WHERE d.mess_id = @mess_id
+  AND @on_date BETWEEN d.start_date AND d.end_date
+  AND NOT EXISTS (SELECT 1 FROM mess_rebates r
+                  WHERE r.student_id = d.student_id AND r.status = 'APPROVED'
+                    AND @on_date BETWEEN r.start_date AND r.end_date)
+  AND NOT EXISTS (SELECT 1 FROM meal_optouts o
+                  WHERE o.student_id = d.student_id
+                    AND o.meal_date = @on_date AND o.slot_id = @slot_id)
+  AND NOT EXISTS (SELECT 1 FROM meal_attendance a
+                  WHERE a.student_id = d.student_id
+                    AND a.attendance_date = @on_date AND a.slot_id = @slot_id);
 
 -- QUERY 13: Waste per meal per day (kg, % of cooked food, rupee cost)
 SELECT mess_name, production_date, slot_name, diet_category,
@@ -250,43 +247,57 @@ LEFT JOIN (SELECT menu_id, ROUND(AVG(rating), 2) AS avg_rating, COUNT(*) AS revi
            FROM mess_feedbacks WHERE menu_id IS NOT NULL GROUP BY menu_id) fb ON fb.menu_id = wm.menu_id
 ORDER BY wa.waste_kg DESC;
 
--- QUERY 16: Production target for tomorrow's lunch
--- headcount = active subscribers - approved leaves - declared opt-outs
--- kg per head = (cooked - wasted) / planned heads over last 14 days (actual consumption)
-SET @target_date = CURDATE() + INTERVAL 1 DAY, @target_slot = 2;
+-- QUERY 16: Production target (@target_date, @target_slot)
+-- headcount = eligible - approved leaves - opt-outs (same block as Q2/Q12)
+-- kg per head = (cooked - wasted) / actual swipes, last 14 days
 WITH waste AS (
     SELECT production_id, SUM(waste_kg) AS waste_kg FROM food_waste_log GROUP BY production_id
 ),
-hist AS (
+prod_actual AS (
     SELECT p.mess_id, p.slot_id, p.diet_category,
-           SUM(p.prepared_kg - COALESCE(w.waste_kg, 0)) / SUM(p.planned_headcount) AS net_kg_per_head
+           p.prepared_kg - COALESCE(w.waste_kg, 0) AS eaten_kg,
+           (SELECT COUNT(*) FROM meal_attendance a
+              JOIN diet_map dm ON dm.dietary_preference = a.diet_served
+             WHERE a.mess_id = p.mess_id AND a.slot_id = p.slot_id
+               AND a.attendance_date = p.production_date
+               AND dm.kitchen_group = p.diet_category) AS swipes
     FROM meal_production p
     LEFT JOIN waste w ON w.production_id = p.production_id
-    WHERE p.production_date >= CURDATE() - INTERVAL 14 DAY AND p.planned_headcount > 0
-    GROUP BY p.mess_id, p.slot_id, p.diet_category
+    WHERE p.production_date >= CURDATE() - INTERVAL 14 DAY
+),
+hist AS (
+    SELECT mess_id, slot_id, diet_category, SUM(eaten_kg) / SUM(swipes) AS net_kg_per_head
+    FROM prod_actual WHERE swipes > 0
+    GROUP BY mess_id, slot_id, diet_category
+),
+global_hist AS (
+    SELECT slot_id, diet_category, SUM(eaten_kg) / SUM(swipes) AS net_kg_per_head
+    FROM prod_actual WHERE swipes > 0
+    GROUP BY slot_id, diet_category
 ),
 demand AS (
-    SELECT sub.mess_id,
-           CASE WHEN s.dietary_preference IN ('NON_VEG', 'EGG_ONLY') THEN 'NON_VEG' ELSE 'VEG' END AS diet_group,
-           COUNT(*) AS headcount
-    FROM student_mess_subscriptions sub
-    JOIN students s ON sub.student_id = s.student_id
-    WHERE sub.status = 'ACTIVE'
-      AND s.account_status = 'ACTIVE'
-      AND @target_date BETWEEN sub.start_date AND sub.end_date
-      AND s.student_id NOT IN (SELECT student_id FROM mess_rebates
-                               WHERE status = 'APPROVED' AND @target_date BETWEEN start_date AND end_date)
-      AND s.student_id NOT IN (SELECT student_id FROM meal_optouts
-                               WHERE meal_date = @target_date AND slot_id = @target_slot)
-    GROUP BY sub.mess_id, diet_group
+    SELECT d.mess_id, d.kitchen_group AS diet_group, COUNT(*) AS headcount
+    FROM v_eligible_diners d
+    WHERE @target_date BETWEEN d.start_date AND d.end_date
+      AND NOT EXISTS (SELECT 1 FROM mess_rebates r
+                      WHERE r.student_id = d.student_id AND r.status = 'APPROVED'
+                        AND @target_date BETWEEN r.start_date AND r.end_date)
+      AND NOT EXISTS (SELECT 1 FROM meal_optouts o
+                      WHERE o.student_id = d.student_id
+                        AND o.meal_date = @target_date AND o.slot_id = @target_slot)
+    GROUP BY d.mess_id, d.kitchen_group
 )
-SELECT m.mess_name, d.diet_group, d.headcount,
-       ROUND(h.net_kg_per_head, 3) AS net_kg_per_head,
-       ROUND(d.headcount * h.net_kg_per_head, 2) AS suggested_kg_to_cook
-FROM demand d
-JOIN messes m ON d.mess_id = m.mess_id
-LEFT JOIN hist h ON h.mess_id = d.mess_id AND h.diet_category = d.diet_group AND h.slot_id = @target_slot
-ORDER BY m.mess_name, d.diet_group;
+SELECT m.mess_name, dm.diet_group, dm.headcount,
+       ROUND(COALESCE(h.net_kg_per_head, g.net_kg_per_head, @default_kg_per_head), 3) AS kg_per_head,
+       CASE WHEN h.net_kg_per_head IS NOT NULL THEN 'mess history'
+            WHEN g.net_kg_per_head IS NOT NULL THEN 'all-mess average'
+            ELSE 'default' END AS basis,
+       ROUND(dm.headcount * COALESCE(h.net_kg_per_head, g.net_kg_per_head, @default_kg_per_head), 2) AS suggested_kg_to_cook
+FROM demand dm
+JOIN messes m ON m.mess_id = dm.mess_id
+LEFT JOIN hist h ON h.mess_id = dm.mess_id AND h.diet_category = dm.diet_group AND h.slot_id = @target_slot
+LEFT JOIN global_hist g ON g.diet_category = dm.diet_group AND g.slot_id = @target_slot
+ORDER BY m.mess_name, dm.diet_group;
 
 -- QUERY 17: Weekly waste trend per mess (is it going down?)
 SELECT mess_name,

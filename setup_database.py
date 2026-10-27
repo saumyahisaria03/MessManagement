@@ -25,8 +25,9 @@ def confirm_wipe(cursor, force):
     cursor.execute("SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name = %s", (DB_NAME,))
     if not cursor.fetchone()[0]:
         return
-    cur.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = %s AND table_type = 'BASE TABLE'",
-                (DB_NAME,))
+    cursor.execute(
+        "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = %s AND table_type = 'BASE TABLE'",
+        (DB_NAME,))
     n_tables = cursor.fetchone()[0]
     print(f"[!] Database `{DB_NAME}` already exists ({n_tables} tables). schema.sql will DROP it.")
     if force:
@@ -81,19 +82,24 @@ def run_verifications(conn):
                 ["Reg No", "Full Name", "Hostel", "Room", "Dietary Pref", "Phone"], cur.fetchall())
 
     cur.execute("""
-        SELECT m.mess_name, s.dietary_preference, COUNT(s.student_id)
-        FROM student_mess_subscriptions sub
-        JOIN messes m ON sub.mess_id = m.mess_id
-        JOIN students s ON sub.student_id = s.student_id
-        WHERE sub.status = 'ACTIVE'
-          AND CURDATE() BETWEEN sub.start_date AND sub.end_date
-          AND s.student_id NOT IN (
-              SELECT student_id FROM mess_rebates
-              WHERE status = 'APPROVED' AND CURDATE() BETWEEN start_date AND end_date)
-        GROUP BY m.mess_name, s.dietary_preference
-        ORDER BY m.mess_name, s.dietary_preference""")
-    print_table("Daily Kitchen Meal Demand Forecast (Excluding Active Leaves)",
-                ["Mess Name", "Diet Category", "Expected Count"], cur.fetchall())
+                SELECT m.mess_name, d.kitchen_group, COUNT(*)
+                FROM v_eligible_diners d
+                         JOIN messes m ON m.mess_id = d.mess_id
+                WHERE CURDATE() BETWEEN d.start_date AND d.end_date
+                  AND NOT EXISTS (SELECT 1
+                                  FROM mess_rebates r
+                                  WHERE r.student_id = d.student_id
+                                    AND r.status = 'APPROVED'
+                                    AND CURDATE() BETWEEN r.start_date AND r.end_date)
+                  AND NOT EXISTS (SELECT 1
+                                  FROM meal_optouts o
+                                  WHERE o.student_id = d.student_id
+                                    AND o.meal_date = CURDATE()
+                                    AND o.slot_id = 2)
+                GROUP BY m.mess_name, d.kitchen_group
+                ORDER BY m.mess_name, d.kitchen_group""")
+    print_table("Daily Kitchen Meal Demand Forecast (Lunch, excl. leaves and opt-outs)",
+                ["Mess Name", "Diet Group", "Expected Count"], cur.fetchall())
 
     cur.execute("""
         SELECT s.registration_no, s.full_name, r.start_date, r.end_date, r.reason, r.status
