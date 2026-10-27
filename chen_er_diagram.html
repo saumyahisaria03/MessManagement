@@ -78,13 +78,18 @@
             background: radial-gradient(circle at center, #131b2e 0%, #090d16 100%);
             overflow: hidden;
         }
-        #svg-embed {
+        #svg-host {
             width: 100%;
             height: 100%;
             cursor: grab;
         }
-        #svg-embed:active {
+        #svg-host:active {
             cursor: grabbing;
+        }
+        #svg-host svg {
+            width: 100%;
+            height: 100%;
+            display: block;
         }
         .hud-controls {
             position: absolute;
@@ -181,7 +186,7 @@
     <div class="main-layout">
         <!-- SVG Canvas Area -->
         <div class="viewport-container">
-            <object id="svg-embed" type="image/svg+xml" data="chen_er_diagram.svg"></object>
+            <div id="svg-host"></div>
 
             <div class="hud-controls">
                 <button id="btn-zoom-in" title="Zoom In">+</button>
@@ -269,31 +274,29 @@
     </div>
 
     <script>
-        window.addEventListener('load', () => {
-            const embed = document.getElementById('svg-embed');
-            embed.addEventListener('load', () => {
-                const svgDoc = embed.contentDocument;
-                const svgElement = svgDoc.querySelector('svg');
-                if (svgElement) {
-                    const panZoom = svgPanZoom(svgElement, {
-                        zoomEnabled: true,
-                        controlIconsEnabled: false,
-                        fit: true,
-                        center: true,
-                        minZoom: 0.3,
-                        maxZoom: 6,
-                        zoomScaleSensitivity: 0.25
-                    });
-
-                    document.getElementById('btn-zoom-in').addEventListener('click', () => panZoom.zoomIn());
-                    document.getElementById('btn-zoom-out').addEventListener('click', () => panZoom.zoomOut());
-                    document.getElementById('btn-reset').addEventListener('click', () => {
-                        panZoom.resetZoom();
-                        panZoom.center();
-                    });
-                }
-            });
+    fetch('chen_er_diagram.svg')
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(txt => {
+        const host = document.getElementById('svg-host');
+        host.innerHTML = txt;
+        const svg = host.querySelector('svg');
+        const pz = svgPanZoom(svg, {
+          zoomEnabled: true,
+          controlIconsEnabled: false,
+          fit: true,
+          center: true,
+          minZoom: 0.3,
+          maxZoom: 6,
+          zoomScaleSensitivity: 0.25
         });
+        document.getElementById('btn-zoom-in').onclick  = () => pz.zoomIn();
+        document.getElementById('btn-zoom-out').onclick = () => pz.zoomOut();
+        document.getElementById('btn-reset').onclick    = () => { pz.resetZoom(); pz.center(); };
+      })
+      .catch(e => {
+        document.getElementById('svg-host').textContent =
+          'Could not load SVG (' + e.message + '). Serve over HTTP: python -m http.server';
+      });
     </script>
 </body>
 </html>

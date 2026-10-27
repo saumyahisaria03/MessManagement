@@ -1,42 +1,30 @@
 -- ============================================================================
--- MESS MANAGEMENT SYSTEM SEED DATA
--- File: seed_data.sql
--- Description: Realistic test fixtures covering hostels, messes, students,
---              meal slots, weekly menus, subscriptions, attendance logs,
---              rebates, bills, guest meals, feedback, and inventory.
+-- MESS MANAGEMENT SYSTEM SEED DATA (MySQL)
+-- Run AFTER schema.sql
 -- ============================================================================
+USE mess_management;
 
--- ----------------------------------------------------------------------------
--- 1. Insert Hostels
--- ----------------------------------------------------------------------------
+-- 1. Hostels
 INSERT INTO hostels (hostel_id, hostel_name, block_code, gender_type, warden_name, warden_contact) VALUES
 (1, 'Aryabhata Boys Hostel', 'BH-1', 'MALE', 'Dr. Ramesh Sharma', '+91-9876543210'),
 (2, 'CV Raman Boys Hostel', 'BH-2', 'MALE', 'Prof. Arvind Menon', '+91-9876543211'),
 (3, 'Kalpana Chawla Girls Hostel', 'GH-1', 'FEMALE', 'Dr. Sunita Deshmukh', '+91-9876543212'),
 (4, 'Gargi Girls Hostel', 'GH-2', 'FEMALE', 'Prof. Meenakshi Sundaram', '+91-9876543213');
 
--- ----------------------------------------------------------------------------
--- 2. Insert Messes (Dining Halls)
--- ----------------------------------------------------------------------------
+-- 2. Messes
 INSERT INTO messes (mess_id, mess_name, mess_type, hostel_id, capacity, caterer_name, caterer_contact, monthly_base_fee, per_day_rebate_rate, status) VALUES
 (1, 'Central Dining Hall - North Mess', 'VEG_NON_VEG', 1, 400, 'Annapurna Hospitality Services', '+91-9123456780', 4200.00, 110.00, 'ACTIVE'),
 (2, 'Kaveri Dining Hall - South Mess', 'PURE_VEG', 2, 350, 'Shree Krishna Caterers', '+91-9123456781', 3800.00, 100.00, 'ACTIVE'),
 (3, 'Pragati Dining Hall - Multi-Cuisine', 'VEG_NON_VEG', 3, 450, 'Royal Feast Caterers', '+91-9123456782', 4400.00, 115.00, 'ACTIVE');
 
--- ----------------------------------------------------------------------------
--- 3. Insert Meal Slots
--- ----------------------------------------------------------------------------
+-- 3. Meal Slots
 INSERT INTO meal_slots (slot_id, slot_name, start_time, end_time, guest_rate) VALUES
 (1, 'BREAKFAST', '07:30:00', '09:30:00', 50.00),
 (2, 'LUNCH', '12:00:00', '14:15:00', 90.00),
 (3, 'SNACKS', '17:00:00', '18:15:00', 35.00),
 (4, 'DINNER', '19:30:00', '21:45:00', 95.00);
 
--- ----------------------------------------------------------------------------
--- 4. Insert Students
--- Attributes: Name, Registration number, Room number, Veg/Non-Veg Food preference
--- plus contact, academic, and hostel details.
--- ----------------------------------------------------------------------------
+-- 4. Students
 INSERT INTO students (student_id, registration_no, full_name, hostel_id, room_no, dietary_preference, email, phone_number, department, year_of_study, emergency_contact, blood_group, account_status) VALUES
 (1, '2023BCSE0101', 'Aarav Sharma', 1, 'B-204', 'NON_VEG', 'aarav.sharma@univ.edu', '+91-9811122331', 'Computer Science & Engineering', 2, '+91-9911122331', 'B+', 'ACTIVE'),
 (2, '2023BCSE0102', 'Priya Patel', 3, 'G-108', 'VEG', 'priya.patel@univ.edu', '+91-9811122332', 'Computer Science & Engineering', 2, '+91-9911122332', 'O+', 'ACTIVE'),
@@ -49,9 +37,7 @@ INSERT INTO students (student_id, registration_no, full_name, hostel_id, room_no
 (9, '2022BIT0022', 'Tanvi Reddy', 3, 'G-214', 'NON_VEG', 'tanvi.reddy@univ.edu', '+91-9811122339', 'Information Technology', 3, '+91-9911122339', 'B+', 'ACTIVE'),
 (10, '2023BMEE0054', 'Gurpreet Singh', 2, 'C-220', 'NON_VEG', 'gurpreet.s@univ.edu', '+91-9811122340', 'Mechanical Engineering', 2, '+91-9911122340', 'A+', 'ACTIVE');
 
--- ----------------------------------------------------------------------------
--- 5. Insert Student Mess Subscriptions
--- ----------------------------------------------------------------------------
+-- 5. Subscriptions
 INSERT INTO student_mess_subscriptions (subscription_id, student_id, mess_id, start_date, end_date, plan_type, status) VALUES
 (1, 1, 1, '2026-08-01', '2026-12-31', 'SEMESTER', 'ACTIVE'),
 (2, 2, 3, '2026-08-01', '2026-12-31', 'SEMESTER', 'ACTIVE'),
@@ -64,11 +50,8 @@ INSERT INTO student_mess_subscriptions (subscription_id, student_id, mess_id, st
 (9, 9, 3, '2026-08-01', '2026-12-31', 'SEMESTER', 'ACTIVE'),
 (10, 10, 1, '2026-08-01', '2026-12-31', 'SEMESTER', 'ACTIVE');
 
--- ----------------------------------------------------------------------------
--- 6. Insert Weekly Menus (Dishes, Categories)
--- ----------------------------------------------------------------------------
+-- 6. Weekly Menus
 INSERT INTO weekly_menus (mess_id, day_of_week, slot_id, diet_category, menu_items, special_notes) VALUES
--- Monday - Central Mess
 (1, 'MONDAY', 1, 'COMMON', 'Aloo Paratha, Curd, Pickle, Tea, Coffee, Bread-Butter, Bananas', 'Standard Breakfast'),
 (1, 'MONDAY', 2, 'COMMON', 'Steamed Rice, Chapatis, Dal Tadka, Salad, Gulab Jamun', 'Daily Lunch Base'),
 (1, 'MONDAY', 2, 'VEG', 'Shahi Paneer, Mix Veg Korma', 'Vegetarian Main'),
@@ -77,8 +60,6 @@ INSERT INTO weekly_menus (mess_id, day_of_week, slot_id, diet_category, menu_ite
 (1, 'MONDAY', 4, 'COMMON', 'Jeera Rice, Chapatis, Dal Makhani, Papad, Kheer', 'Dinner Base'),
 (1, 'MONDAY', 4, 'VEG', 'Malai Kofta, Bhindi Do Pyaza', 'Vegetarian Main'),
 (1, 'MONDAY', 4, 'NON_VEG', 'Egg Curry, Chicken Sukka', 'Non-Veg Option'),
-
--- Tuesday - Central Mess
 (1, 'TUESDAY', 1, 'COMMON', 'Poha, Sev, Boiled Sprouts, Jalebi, Milk, Tea, Toast', 'Breakfast'),
 (1, 'TUESDAY', 2, 'COMMON', 'Veg Biryani, Plain Rice, Raita, Yellow Dal, Roti', 'Lunch Common'),
 (1, 'TUESDAY', 2, 'VEG', 'Mushroom Masala, Baingan Bharta', 'Veg Lunch Item'),
@@ -87,19 +68,14 @@ INSERT INTO weekly_menus (mess_id, day_of_week, slot_id, diet_category, menu_ite
 (1, 'TUESDAY', 4, 'COMMON', 'Phulka, Basmati Rice, Dal Fry, Ice Cream', 'Dinner Common'),
 (1, 'TUESDAY', 4, 'VEG', 'Paneer Butter Masala, Aloo Gobi', 'Veg Dinner'),
 (1, 'TUESDAY', 4, 'NON_VEG', 'Fish Curry, Tawa Egg Bhurji', 'Non-Veg Dinner'),
-
--- Wednesday - South Mess (Pure Veg)
 (2, 'WEDNESDAY', 1, 'COMMON', 'Idli, Medu Vada, Coconut Chutney, Sambar, Filter Coffee', 'Traditional South Indian'),
 (2, 'WEDNESDAY', 2, 'COMMON', 'Boiled Ponni Rice, Sambar, Rasam, Curd, Appalam, Payasam', 'South Indian Lunch Thali'),
 (2, 'WEDNESDAY', 2, 'VEG', 'Poriyal (Cabbage/Carrot), Paneer Chettinad', 'Veg Accompaniments'),
 (2, 'WEDNESDAY', 3, 'COMMON', 'Mysore Bonda, Chutney, Tea, Coffee', 'Evening Snack'),
 (2, 'WEDNESDAY', 4, 'COMMON', 'Dosa, Chutney Trio, Sambar, Lemon Rice, Roti, Dal', 'Dinner');
 
--- ----------------------------------------------------------------------------
--- 7. Insert Meal Attendance Logs (Check-in scans)
--- ----------------------------------------------------------------------------
+-- 7. Meal Attendance
 INSERT INTO meal_attendance (attendance_id, student_id, mess_id, slot_id, attendance_date, diet_served, verification_type, scanned_at) VALUES
--- 2026-10-12
 (1, 1, 1, 1, '2026-10-12', 'NON_VEG', 'RFID', '2026-10-12 08:05:12'),
 (2, 1, 1, 2, '2026-10-12', 'NON_VEG', 'RFID', '2026-10-12 12:45:30'),
 (3, 1, 1, 4, '2026-10-12', 'NON_VEG', 'RFID', '2026-10-12 20:10:04'),
@@ -110,8 +86,6 @@ INSERT INTO meal_attendance (attendance_id, student_id, mess_id, slot_id, attend
 (8, 4, 1, 2, '2026-10-12', 'NON_VEG', 'RFID', '2026-10-12 13:20:00'),
 (9, 6, 1, 2, '2026-10-12', 'NON_VEG', 'RFID', '2026-10-12 12:50:18'),
 (10, 8, 2, 2, '2026-10-12', 'VEG', 'BIOMETRIC', '2026-10-12 13:15:00'),
-
--- 2026-10-13 (Current date attendance)
 (11, 1, 1, 1, '2026-10-13', 'NON_VEG', 'RFID', '2026-10-13 08:15:00'),
 (12, 1, 1, 2, '2026-10-13', 'NON_VEG', 'RFID', '2026-10-13 13:05:00'),
 (13, 2, 3, 1, '2026-10-13', 'VEG', 'BIOMETRIC', '2026-10-13 08:45:00'),
@@ -122,9 +96,7 @@ INSERT INTO meal_attendance (attendance_id, student_id, mess_id, slot_id, attend
 (18, 8, 2, 2, '2026-10-13', 'VEG', 'BIOMETRIC', '2026-10-13 13:05:00'),
 (19, 10, 1, 2, '2026-10-13', 'NON_VEG', 'RFID', '2026-10-13 13:12:00');
 
--- ----------------------------------------------------------------------------
--- 8. Insert Mess Rebates / Leave Applications
--- ----------------------------------------------------------------------------
+-- 8. Mess Rebates
 INSERT INTO mess_rebates (rebate_id, student_id, start_date, end_date, reason, status, approved_by, decision_remarks, applied_at) VALUES
 (1, 3, '2026-10-13', '2026-10-18', 'Going home for family function and festival', 'APPROVED', 'Dr. Ramesh Sharma', 'Leave granted as per university rules', '2026-10-10 14:00:00'),
 (2, 4, '2026-10-13', '2026-10-16', 'Attending Inter-IIT Sports Meet in Delhi', 'APPROVED', 'Prof. Arvind Menon', 'Official sports representation approved', '2026-10-09 11:30:00'),
@@ -132,11 +104,8 @@ INSERT INTO mess_rebates (rebate_id, student_id, start_date, end_date, reason, s
 (4, 7, '2026-09-10', '2026-09-15', 'Attending National Hackathon Conference', 'APPROVED', 'Prof. Meenakshi Sundaram', 'Academic representation verified', '2026-09-05 09:15:00'),
 (5, 9, '2026-09-18', '2026-09-21', 'Personal leave', 'REJECTED', 'Dr. Sunita Deshmukh', 'Minimum consecutive leave is 4 full days', '2026-09-16 10:00:00');
 
--- ----------------------------------------------------------------------------
--- 9. Insert Monthly Bills
--- ----------------------------------------------------------------------------
+-- 9. Monthly Bills
 INSERT INTO monthly_bills (bill_id, student_id, mess_id, billing_month, billing_year, base_fee, rebate_days, rebate_amount, guest_charges, fines_or_extras, net_payable, payment_status, due_date, paid_at, transaction_reference) VALUES
--- September 2026 Bills
 (1, 1, 1, 9, 2026, 4200.00, 0, 0.00, 180.00, 0.00, 4380.00, 'PAID', '2026-10-10', '2026-10-05 14:22:10', 'UPI/20260905142210/SBI01'),
 (2, 2, 3, 9, 2026, 4400.00, 0, 0.00, 0.00, 0.00, 4400.00, 'PAID', '2026-10-10', '2026-10-07 19:40:02', 'HDFC/NETB/992817462'),
 (3, 3, 2, 9, 2026, 3800.00, 0, 0.00, 90.00, 0.00, 3890.00, 'PAID', '2026-10-10', '2026-10-08 11:15:43', 'ICICI/UPI/772183912'),
@@ -145,18 +114,14 @@ INSERT INTO monthly_bills (bill_id, student_id, mess_id, billing_month, billing_
 (6, 6, 1, 9, 2026, 4200.00, 0, 0.00, 0.00, 0.00, 4200.00, 'PAID', '2026-10-10', '2026-10-09 21:05:33', 'AXIS/NETB/334910284'),
 (7, 10, 1, 9, 2026, 4200.00, 0, 0.00, 95.00, 0.00, 4295.00, 'OVERDUE', '2026-10-10', NULL, NULL);
 
--- ----------------------------------------------------------------------------
--- 10. Insert Guest Meals
--- ----------------------------------------------------------------------------
+-- 10. Guest Meals
 INSERT INTO guest_meals (guest_meal_id, host_student_id, mess_id, slot_id, booking_date, guest_count, diet_preference, total_charge, status) VALUES
 (1, 1, 1, 2, '2026-09-15', 2, 'NON_VEG', 180.00, 'CONSUMED'),
 (2, 3, 2, 2, '2026-09-20', 1, 'VEG', 90.00, 'CONSUMED'),
 (3, 10, 1, 4, '2026-09-28', 1, 'NON_VEG', 95.00, 'CONSUMED'),
 (4, 2, 3, 2, '2026-10-14', 2, 'VEG', 180.00, 'BOOKED');
 
--- ----------------------------------------------------------------------------
--- 11. Insert Mess Feedbacks & Grievances
--- ----------------------------------------------------------------------------
+-- 11. Feedback
 INSERT INTO mess_feedbacks (feedback_id, student_id, mess_id, slot_id, rating, category, comments, status, action_taken) VALUES
 (1, 1, 1, 4, 4, 'FOOD_QUALITY', 'Dinner paneer was fresh and delicious. Chicken portion was generous.', 'RESOLVED', 'Feedback shared with executive chef'),
 (2, 3, 2, 1, 5, 'HYGIENE', 'Dining tables and washing area are remarkably neat and clean.', 'RESOLVED', 'Appreciation noted for housekeeping team'),
@@ -164,14 +129,12 @@ INSERT INTO mess_feedbacks (feedback_id, student_id, mess_id, slot_id, rating, c
 (4, 2, 3, 3, 4, 'FOOD_QUALITY', 'Snacks tea and samosas were warm and crispy.', 'RESOLVED', 'Noted'),
 (5, 6, 1, 4, 2, 'PUNCTUALITY', 'Dinner serving started 20 minutes late causing a long queue.', 'UNDER_REVIEW', 'Caterer issued formal advisory note');
 
--- ----------------------------------------------------------------------------
--- 12. Insert Kitchen Inventory Items
--- ----------------------------------------------------------------------------
+-- 12. Inventory (items 3, 4 and 8 are below reorder threshold)
 INSERT INTO inventory_items (item_id, mess_id, item_name, category, unit, current_stock, reorder_threshold, last_restocked_date) VALUES
 (1, 1, 'Basmati Rice', 'GRAINS_PULSES', 'KG', 450.00, 100.00, '2026-10-08'),
 (2, 1, 'Toor Dal', 'GRAINS_PULSES', 'KG', 120.00, 50.00, '2026-10-08'),
-(3, 1, 'Fresh Paneer', 'DAIRY', 'KG', 25.00, 30.00, '2026-10-12'), -- Below reorder threshold!
-(4, 1, 'Chicken (Broiler)', 'MEAT_POULTRY', 'KG', 18.00, 40.00, '2026-10-12'), -- Below reorder threshold!
+(3, 1, 'Fresh Paneer', 'DAIRY', 'KG', 25.00, 30.00, '2026-10-12'),
+(4, 1, 'Chicken (Broiler)', 'MEAT_POULTRY', 'KG', 18.00, 40.00, '2026-10-12'),
 (5, 1, 'Refined Sunflower Oil', 'SPICES_OIL', 'LITRE', 85.00, 30.00, '2026-10-05'),
 (6, 2, 'Sona Masoori Rice', 'GRAINS_PULSES', 'KG', 380.00, 80.00, '2026-10-09'),
 (7, 2, 'Urad Dal', 'GRAINS_PULSES', 'KG', 90.00, 35.00, '2026-10-09'),

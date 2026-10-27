@@ -1,41 +1,36 @@
 """
-Test runner to verify all 12 queries in queries.sql against mess_management.db
+Runs every query in queries.sql against the MySQL `mess_management` database.
+Run setup_database.py first.
 """
-
-import sqlite3
 import os
+import mysql.connector
+from db_config import MYSQL_CONFIG, DB_NAME, BASE_DIR
 
-DB_FILE = os.path.join(os.path.dirname(__file__), "mess_management.db")
-QUERIES_FILE = os.path.join(os.path.dirname(__file__), "queries.sql")
+
+def split_queries(text):
+    """Split on ';' and keep only chunks that contain a SELECT (preserves title comments)."""
+    out = []
+    for chunk in text.split(";"):
+        body = "\n".join(l for l in chunk.splitlines() if not l.strip().startswith("--")).strip()
+        if body.upper().startswith("SELECT"):
+            title = next((l.strip(" -") for l in chunk.splitlines() if "QUERY" in l), f"Query {len(out) + 1}")
+            out.append((title, body))
+    return out
+
 
 def test_all_queries():
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-
-    with open(QUERIES_FILE, "r", encoding="utf-8") as f:
-        content = f.read()
-
-    # Split queries by semicolon, ignoring comments
-    statements = [stmt.strip() for stmt in content.split(";") if stmt.strip()]
-    
-    print(f"[*] Testing {len(statements)} queries from queries.sql...")
-    for idx, stmt in enumerate(statements, 1):
-        try:
-            cursor.execute(stmt)
-            rows = cursor.fetchall()
-            # Extract query title from first comment line if present
-            title = f"Query {idx}"
-            for line in stmt.splitlines():
-                if "QUERY" in line:
-                    title = line.strip(" -/*")
-                    break
-            print(f"  [+] {title}: returned {len(rows)} rows (Success)")
-        except Exception as e:
-            print(f"  [-] Query {idx} failed: {e}")
-            raise
-
+    conn = mysql.connector.connect(database=DB_NAME, **MYSQL_CONFIG)
+    cur = conn.cursor()
+    with open(os.path.join(BASE_DIR, "queries.sql"), "r", encoding="utf-8") as f:
+        queries = split_queries(f.read())
+    print(f"[*] Testing {len(queries)} queries from queries.sql...")
+    for title, sql in queries:
+        cur.execute(sql)
+        print(f"  [+] {title}: returned {len(cur.fetchall())} rows (Success)")
+    cur.close()
     conn.close()
-    print("[OK] All 12 queries in queries.sql ran successfully!")
+    print(f"[OK] All {len(queries)} queries ran successfully!")
+
 
 if __name__ == "__main__":
     test_all_queries()

@@ -12,9 +12,10 @@ d:\Prj\
 ├── seed_data.sql          # Realistic test fixtures (hostels, messes, students, menus, logs, bills)
 ├── queries.sql            # 12 operational & analytical business queries
 ├── database_design.md     # Detailed ER diagram (Mermaid), relational schema, 3NF/BCNF analysis
-├── setup_database.py      # Python script to build SQLite database & run checks
+├── db_config.py           # Shared MySQL connection settings used by the Python scripts
+├── setup_database.py      # Python script to build the MySQL database & run checks
 ├── test_queries.py        # Automated test runner validating all 12 queries
-├── mess_management.db     # Generated SQLite database file
+├── requirements.txt       # Python dependency (mysql-connector-python)
 └── README.md              # Project overview and quick start guide
 ```
 
@@ -29,7 +30,7 @@ The system includes the exact attributes requested, properly normalized across r
 | **Name** | `full_name` | `students` | `VARCHAR(100) NOT NULL` | Student's full legal name |
 | **Registration number** | `registration_no` | `students` | `VARCHAR(20) NOT NULL UNIQUE` | Unique student institutional ID |
 | **Room** | `room_no` | `students` | `VARCHAR(10) NOT NULL` | Room number |
-| **Room Block/Hostel** | `hostel_id` | `students` (FK to `hostels`) | `INTEGER NOT NULL` | References hostel building and block code |
+| **Room Block/Hostel** | `hostel_id` | `students` (FK to `hostels`) | `INT NOT NULL` | References hostel building and block code |
 | **Veg / Non Veg Food** | `dietary_preference` | `students` | `VARCHAR(15) NOT NULL CHECK (...)` | `VEG`, `NON_VEG`, `JAIN`, `EGG_ONLY` |
 
 ---
@@ -84,32 +85,36 @@ erDiagram
 
 ## 🚀 How to Run and Test
 
-### Option 1: Automated Python Runner (SQLite)
+Requires **MySQL 8.0.16+** (CHECK constraints are enforced from this version).
+
+### Option 1: MySQL Workbench
+1. Open `schema.sql` and run the whole script (Ctrl+Shift+Enter). It recreates the `mess_management` database.
+2. Open `seed_data.sql` and run it the same way.
+3. Open `queries.sql`, place the cursor inside a query and press Ctrl+Enter to run it.
+
+### Option 2: Automated Python Runner (MySQL)
+Install the dependency and set your MySQL password:
+```powershell
+pip install -r requirements.txt
+$env:MYSQL_PASSWORD="your_password"
+```
+Optional environment variables: `MYSQL_HOST` (default `127.0.0.1`), `MYSQL_PORT` (default `3306`), `MYSQL_USER` (default `root`).
+
 Run the automated initialization script:
 ```powershell
 python setup_database.py
 ```
-This builds `mess_management.db`, enforces foreign keys, loads seed data, and executes key queries.
+This creates the `mess_management` database, enforces foreign keys, loads seed data, and executes key queries.
 
 To test all 12 operational queries:
 ```powershell
 python test_queries.py
 ```
 
-### Option 2: Direct SQL Client (PostgreSQL / MySQL / SQLite CLI)
-Run standard SQL scripts directly:
+### Option 3: MySQL Command Line Client
 ```powershell
-# For SQLite:
-sqlite3 mess_management.db < schema.sql
-sqlite3 mess_management.db < seed_data.sql
-
-# For PostgreSQL:
-psql -U username -d mess_db -f schema.sql
-psql -U username -d mess_db -f seed_data.sql
-
-# For MySQL:
-mysql -u username -p mess_db < schema.sql
-mysql -u username -p mess_db < seed_data.sql
+mysql -u username -p < schema.sql
+mysql -u username -p < seed_data.sql
 ```
 
 ---
