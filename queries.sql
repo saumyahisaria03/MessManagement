@@ -1,16 +1,22 @@
 -- ============================================================================
--- MESS MANAGEMENT SYSTEM BUSINESS & ANALYTICAL QUERIES (MySQL)
--- Run AFTER schema.sql and seed_data.sql
--- In Workbench: run the two SET lines first (same session), then place the cursor
--- inside a query and press Ctrl+Enter.
--- Parameters (override to look at another day / billing cycle):
+-- MESS MANAGEMENT SYSTEM - SELF-CONTAINED QUERIES (MySQL 8.0+)
+-- Run AFTER schema.sql and seed_data.sql.
+--
+-- HOW TO USE
+--   * Whole file : run the script (Workbench: Ctrl+Shift+Enter).
+--   * Single query: copy ONE query block (from its "-- QUERY n" line to its
+--     closing ";") into any SQL tab. Every block that needs parameters carries
+--     its own SET line(s), so it does not depend on any other block.
+--   * IMPORTANT (Workbench): a block has SET + SELECT statements, so SELECT
+--     the whole block first and press Ctrl+Shift+Enter. Ctrl+Enter alone runs
+--     only the statement under the cursor and the SET would be skipped.
+--   * Edit the SET values to look at another day / slot / mess / billing cycle.
+--   * Only the very first line (USE) is needed once per tab/connection.
+--
+-- Header format "-- QUERY n: title" is kept so test_queries.py can parse this
+-- file the same way it parses queries.sql.
 -- ============================================================================
 USE mess_management;
-SET @on_date = CURDATE();
-SET @slot_id = 2, @mess_id = 1;                                    -- Q2 / Q12: meal + mess to look at
-SET @bill_month = 9, @bill_year = 2026;                            -- seeded billing cycle (step 5 fixes)
-SET @target_date = CURDATE() + INTERVAL 1 DAY, @target_slot = 2;   -- Q16: meal to plan
-SET @default_kg_per_head = 0.35;                                   -- Q16: fallback, no history anywhere
 
 -- QUERY 1: Student Profile Lookup by Registration Number
 SELECT
@@ -30,9 +36,11 @@ FROM students s
 JOIN hostels h ON s.hostel_id = h.hostel_id
 LEFT JOIN student_mess_subscriptions sub ON s.student_id = sub.student_id AND sub.status = 'ACTIVE'
 LEFT JOIN messes m ON sub.mess_id = m.mess_id
-WHERE s.registration_no = '2025BCSE0101';
+WHERE s.registration_no = '2025BCSE0101';   -- change the registration number here
 
--- QUERY 2: Kitchen Headcount Demand Forecast (@on_date, @slot_id; excludes leaves and opt-outs)
+-- QUERY 2: Kitchen Headcount Demand Forecast (excludes approved leaves and opt-outs)
+SET @on_date = CURDATE();   -- date to forecast
+SET @slot_id = 2;           -- 1=BREAKFAST 2=LUNCH 3=SNACKS 4=DINNER
 SELECT
     m.mess_name,
     d.kitchen_group,
@@ -50,6 +58,7 @@ GROUP BY m.mess_name, d.kitchen_group
 ORDER BY m.mess_name, d.kitchen_group;
 
 -- QUERY 3: Active Students on Approved Mess Rebate / Leave Today
+SET @on_date = CURDATE();   -- day to check
 SELECT
     r.rebate_id,
     s.registration_no,
@@ -67,7 +76,8 @@ JOIN hostels h ON s.hostel_id = h.hostel_id
 WHERE r.status = 'APPROVED'
   AND @on_date BETWEEN r.start_date AND r.end_date;
 
--- QUERY 4: Monthly Mess Bill Statement (cycle set by @bill_month / @bill_year)
+-- QUERY 4: Monthly Mess Bill Statement
+SET @bill_month = 9, @bill_year = 2026;   -- billing cycle to show
 SELECT
     b.bill_id,
     s.registration_no,
@@ -92,7 +102,7 @@ JOIN messes m ON b.mess_id = m.mess_id
 WHERE b.billing_month = @bill_month AND b.billing_year = @bill_year
 ORDER BY b.net_payable DESC;
 
--- QUERY 5: Fee Defaulter / Overdue Payment Tracking (status OR past due date, so no manual flip is needed)
+-- QUERY 5: Fee Defaulter / Overdue Payment Tracking
 SELECT
     s.registration_no,
     s.full_name,
@@ -113,7 +123,8 @@ WHERE b.payment_status = 'OVERDUE'
    OR (b.payment_status = 'UNPAID' AND b.due_date < CURDATE())
 ORDER BY b.net_payable DESC;
 
--- QUERY 6: Meal Attendance Log for Lunch on @on_date
+-- QUERY 6: Meal Attendance Log for Lunch Today
+SET @on_date = CURDATE();   -- day to check
 SELECT
     a.attendance_id,
     s.registration_no,
@@ -129,7 +140,8 @@ JOIN students s ON a.student_id = s.student_id
 JOIN hostels h ON s.hostel_id = h.hostel_id
 JOIN messes m ON a.mess_id = m.mess_id
 JOIN meal_slots ms ON a.slot_id = ms.slot_id
-WHERE a.attendance_date = @on_date AND ms.slot_name = 'LUNCH'
+WHERE a.attendance_date = @on_date
+  AND ms.slot_name = 'LUNCH'
 ORDER BY a.scanned_at ASC;
 
 -- QUERY 7: Weekly Menu Schedule for Monday (Mess 1)
@@ -199,7 +211,10 @@ JOIN messes m ON gm.mess_id = m.mess_id
 WHERE gm.status = 'CONSUMED'
 GROUP BY m.mess_name, gm.diet_preference;
 
--- QUERY 12: Absenteeism / Meal Skip Detection (@mess_id, @slot_id on @on_date)
+-- QUERY 12: Absenteeism / Meal Skip Detection
+SET @on_date = CURDATE();   -- day to check
+SET @slot_id = 2;           -- 1=BREAKFAST 2=LUNCH 3=SNACKS 4=DINNER
+SET @mess_id = 1;           -- mess to check
 SELECT
     d.registration_no,
     d.full_name,
@@ -247,9 +262,12 @@ LEFT JOIN (SELECT menu_id, ROUND(AVG(rating), 2) AS avg_rating, COUNT(*) AS revi
            FROM mess_feedbacks WHERE menu_id IS NOT NULL GROUP BY menu_id) fb ON fb.menu_id = wm.menu_id
 ORDER BY wa.waste_kg DESC;
 
--- QUERY 16: Production target (@target_date, @target_slot)
--- headcount = eligible - approved leaves - opt-outs (same block as Q2/Q12)
+-- QUERY 16: Production target (suggested kg to cook)
+-- headcount = eligible - approved leaves - opt-outs
 -- kg per head = (cooked - wasted) / actual swipes, last 14 days
+SET @target_date = CURDATE() + INTERVAL 1 DAY;   -- meal date to plan
+SET @target_slot = 2;                              -- 1=BREAKFAST 2=LUNCH 3=SNACKS 4=DINNER
+SET @default_kg_per_head = 0.35;                   -- fallback if no history anywhere
 WITH waste AS (
     SELECT production_id, SUM(waste_kg) AS waste_kg FROM food_waste_log GROUP BY production_id
 ),
