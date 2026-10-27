@@ -25,7 +25,8 @@ def confirm_wipe(cursor, force):
     cursor.execute("SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name = %s", (DB_NAME,))
     if not cursor.fetchone()[0]:
         return
-    cursor.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = %s", (DB_NAME,))
+    cur.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = %s AND table_type = 'BASE TABLE'",
+                (DB_NAME,))
     n_tables = cursor.fetchone()[0]
     print(f"[!] Database `{DB_NAME}` already exists ({n_tables} tables). schema.sql will DROP it.")
     if force:
@@ -67,7 +68,7 @@ def print_table(title, headers, rows):
 def run_verifications(conn):
     cur = conn.cursor()
 
-    cur.execute("SHOW TABLES")
+    cur.execute("SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'")
     tables = [r[0] for r in cur.fetchall()]
     print(f"\n[*] Created Tables ({len(tables)}): {', '.join(tables)}")
 

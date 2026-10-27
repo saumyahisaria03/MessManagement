@@ -12,6 +12,7 @@ from db_config import MYSQL_CONFIG, DB_NAME, BASE_DIR, split_titled_queries
 # where the seed pins them). A query that "runs" but returns nothing is a failure.
 MIN_ROWS = {1: 1, 2: 1, 3: 2, 4: 10, 5: 3, 6: 3, 7: 5, 8: 4, 9: 3, 10: 3, 11: 2, 12: 1,
             13: 5, 14: 3, 15: 2, 16: 2, 17: 2, 18: 1}
+MAX_ROWS = {19: 0}  # audit queries: any row is a failure
 
 
 def test_all_queries():
@@ -29,9 +30,11 @@ def test_all_queries():
             cur.execute(stmt)
             if cur.with_rows:
                 rows = cur.fetchall()
-        need = MIN_ROWS.get(num, 1)
-        ok = len(rows) >= need
-        print(f"  [{'+' if ok else '!'}] Q{num} {title}: {len(rows)} rows (need >= {need})")
+        need = MIN_ROWS.get(num, 1)  # <-- REPLACE these 2 lines
+        cap = MAX_ROWS.get(num)  #
+        ok = len(rows) <= cap if cap is not None else len(rows) >= need  #
+        rule = f"max {cap}" if cap is not None else f"need >= {need}"  # <-- NEW
+        print(f"  [{'+' if ok else '!'}] Q{num} {title}: {len(rows)} rows ({rule})")  # <-- changed print
         if not ok:
             failures.append(num)
     cur.close()

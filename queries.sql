@@ -311,3 +311,23 @@ WHERE f.plate_left IS NOT NULL
 GROUP BY wm.menu_id, m.mess_name, wm.menu_items
 HAVING heavy_leftover_reports >= 1
 ORDER BY heavy_leftover_reports DESC;
+
+-- QUERY 19: Data-integrity audit (every row here is a bad record; expect 0 rows)
+SELECT 'WASTE_EXCEEDS_COOKED' AS issue, p.production_id AS ref_id
+FROM meal_production p
+JOIN food_waste_log w ON w.production_id = p.production_id
+GROUP BY p.production_id, p.prepared_kg
+HAVING SUM(w.waste_kg) > p.prepared_kg
+UNION ALL
+SELECT 'WASTE_MENU_MISMATCH', w.waste_id
+FROM food_waste_log w
+JOIN meal_production p ON w.production_id = p.production_id
+JOIN weekly_menus wm ON w.menu_id = wm.menu_id
+WHERE wm.mess_id <> p.mess_id OR wm.slot_id <> p.slot_id
+UNION ALL
+SELECT 'OPTOUT_NOT_SUBSCRIBED', o.optout_id
+FROM meal_optouts o
+LEFT JOIN student_mess_subscriptions sub
+       ON sub.student_id = o.student_id AND sub.mess_id = o.mess_id
+      AND sub.status = 'ACTIVE' AND o.meal_date BETWEEN sub.start_date AND sub.end_date
+WHERE sub.subscription_id IS NULL;
