@@ -30,11 +30,11 @@ def test_all_queries():
             cur.execute(stmt)
             if cur.with_rows:
                 rows = cur.fetchall()
-        need = MIN_ROWS.get(num, 1)  # <-- REPLACE these 2 lines
-        cap = MAX_ROWS.get(num)  #
-        ok = len(rows) <= cap if cap is not None else len(rows) >= need  #
-        rule = f"max {cap}" if cap is not None else f"need >= {need}"  # <-- NEW
-        print(f"  [{'+' if ok else '!'}] Q{num} {title}: {len(rows)} rows ({rule})")  # <-- changed print
+        need = MIN_ROWS.get(num, 1)
+        cap = MAX_ROWS.get(num)
+        ok = len(rows) <= cap if cap is not None else len(rows) >= need
+        rule = f"max {cap}" if cap is not None else f"need >= {need}"
+        print(f"  [{'+' if ok else '!'}] Q{num} {title}: {len(rows)} rows ({rule})")
         if not ok:
             failures.append(num)
     cur.close()
