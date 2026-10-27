@@ -128,13 +128,15 @@ INSERT INTO guest_meals (guest_meal_id, host_student_id, mess_id, slot_id, booki
 (3, 10, 1, 4, '2026-09-28', 1, 'NON_VEG', 95.00, 'CONSUMED'),
 (4, 2, 3, 2, CURDATE() + INTERVAL 1 DAY, 2, 'VEG', 180.00, 'BOOKED');
 
--- 11. Feedback
-INSERT INTO mess_feedbacks (feedback_id, student_id, mess_id, slot_id, rating, category, comments, status, action_taken) VALUES
-(1, 1, 1, 4, 4, 'FOOD_QUALITY', 'Dinner paneer was fresh and delicious. Chicken portion was generous.', 'RESOLVED', 'Feedback shared with executive chef'),
-(2, 3, 2, 1, 5, 'HYGIENE', 'Dining tables and washing area are remarkably neat and clean.', 'RESOLVED', 'Appreciation noted for housekeeping team'),
-(3, 4, 1, 2, 2, 'PORTION_SIZE', 'Non-veg chicken pieces were very small and ran out before 1:45 PM.', 'OPEN', 'Under inspection by mess committee'),
-(4, 2, 3, 3, 4, 'FOOD_QUALITY', 'Snacks tea and samosas were warm and crispy.', 'RESOLVED', 'Noted'),
-(5, 6, 1, 4, 2, 'PUNCTUALITY', 'Dinner serving started 20 minutes late causing a long queue.', 'UNDER_REVIEW', 'Caterer issued formal advisory note');
+-- 11. Feedback (rows 6-7 are dish-level, linked to menu_id 4 = Mess 1 Monday lunch NON_VEG)
+INSERT INTO mess_feedbacks (feedback_id, student_id, mess_id, slot_id, menu_id, rating, plate_left, category, comments, status, action_taken) VALUES
+(1, 1, 1, 4, NULL, 4, NULL, 'FOOD_QUALITY', 'Dinner paneer was fresh and delicious. Chicken portion was generous.', 'RESOLVED', 'Feedback shared with executive chef'),
+(2, 3, 2, 1, NULL, 5, NULL, 'HYGIENE', 'Dining tables and washing area are remarkably neat and clean.', 'RESOLVED', 'Appreciation noted for housekeeping team'),
+(3, 4, 1, 2, NULL, 2, NULL, 'PORTION_SIZE', 'Non-veg chicken pieces were very small and ran out before 1:45 PM.', 'OPEN', 'Under inspection by mess committee'),
+(4, 2, 3, 3, NULL, 4, NULL, 'FOOD_QUALITY', 'Snacks tea and samosas were warm and crispy.', 'RESOLVED', 'Noted'),
+(5, 6, 1, 4, NULL, 2, NULL, 'PUNCTUALITY', 'Dinner serving started 20 minutes late causing a long queue.', 'UNDER_REVIEW', 'Caterer issued formal advisory note'),
+(6, 1, 1, 2, 4, 2, 'HALF', 'TASTE', 'Chicken curry was too salty, left half of it.', 'OPEN', NULL),
+(7, 6, 1, 2, 4, 2, 'MOST', 'TASTE', 'Chicken was dry; could not finish it.', 'OPEN', NULL);
 
 -- 12. Inventory (items 3, 4 and 8 are below reorder threshold)
 INSERT INTO inventory_items (item_id, mess_id, item_name, category, unit, current_stock, reorder_threshold, last_restocked_date) VALUES
@@ -146,3 +148,27 @@ INSERT INTO inventory_items (item_id, mess_id, item_name, category, unit, curren
 (6, 2, 'Sona Masoori Rice', 'GRAINS_PULSES', 'KG', 380.00, 80.00, '2026-10-09'),
 (7, 2, 'Urad Dal', 'GRAINS_PULSES', 'KG', 90.00, 35.00, '2026-10-09'),
 (8, 2, 'Cow Milk', 'DAIRY', 'LITRE', 45.00, 50.00, '2026-10-13');
+
+-- 13. Meal Production (menu_id 4 = Mess 1 Mon lunch NON_VEG, 8 = Mess 1 Mon dinner NON_VEG)
+INSERT INTO meal_production (production_id, mess_id, slot_id, production_date, diet_category, planned_headcount, prepared_kg, cost_per_kg, prepared_by) VALUES
+(1, 1, 2, CURDATE() - INTERVAL 1 DAY, 'NON_VEG', 4, 2.40, 240.00, 'Chef Raju'),
+(2, 1, 4, CURDATE() - INTERVAL 1 DAY, 'NON_VEG', 4, 2.20, 240.00, 'Chef Raju'),
+(3, 1, 2, CURDATE() - INTERVAL 2 DAY, 'NON_VEG', 4, 2.80, 240.00, 'Chef Raju'),
+(4, 2, 2, CURDATE() - INTERVAL 1 DAY, 'VEG', 3, 1.80, 120.00, 'Chef Lakshmi'),
+(5, 2, 2, CURDATE() - INTERVAL 2 DAY, 'VEG', 3, 1.60, 120.00, 'Chef Lakshmi');
+
+-- 14. Food Waste Log
+INSERT INTO food_waste_log (production_id, menu_id, waste_stage, reason, waste_kg, recorded_by) VALUES
+(1, 4, 'LEFTOVER', 'OVERPRODUCTION', 0.60, 'Supervisor Anil'),
+(1, 4, 'PLATE', 'POOR_QUALITY', 0.30, 'Supervisor Anil'),
+(2, 8, 'LEFTOVER', 'OVERPRODUCTION', 0.40, 'Supervisor Anil'),
+(3, 4, 'LEFTOVER', 'OVERPRODUCTION', 0.90, 'Supervisor Anil'),
+(3, 4, 'PLATE', 'POOR_QUALITY', 0.35, 'Supervisor Anil'),
+(4, NULL, 'LEFTOVER', 'LOW_ATTENDANCE', 0.25, 'Supervisor Sita'),
+(5, NULL, 'LEFTOVER', 'OVERPRODUCTION', 0.20, 'Supervisor Sita'),
+(5, NULL, 'PLATE', 'OVERPORTIONING', 0.10, 'Supervisor Sita');
+
+-- 15. Meal Opt-outs (tomorrow's lunch; students 1 and 6 are in Mess 1)
+INSERT INTO meal_optouts (student_id, mess_id, slot_id, meal_date, reason) VALUES
+(1, 1, 2, CURDATE() + INTERVAL 1 DAY, 'ACADEMIC'),
+(6, 1, 2, CURDATE() + INTERVAL 1 DAY, 'EATING_OUT');

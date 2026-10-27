@@ -119,6 +119,15 @@ def run_verifications(conn):
     print_table("Critical Kitchen Low-Stock Alerts",
                 ["Mess", "Item Name", "Category", "Stock", "Threshold", "Unit"], cur.fetchall())
 
+    cur.execute("""
+        SELECT mess_name, production_date, slot_name, diet_category,
+               prepared_kg, waste_kg, waste_pct, waste_cost_inr
+        FROM v_waste_summary
+        ORDER BY production_date DESC, mess_name, slot_name""")
+    print_table("Food Waste Summary (kg / % / INR)",
+                ["Mess", "Date", "Slot", "Diet", "Cooked kg", "Waste kg", "Waste %", "Cost INR"],
+                cur.fetchall())
+
     cur.close()
     print("\n[OK] Verification queries completed.\n")
 

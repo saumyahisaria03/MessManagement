@@ -10,7 +10,8 @@ from db_config import MYSQL_CONFIG, DB_NAME, BASE_DIR, split_titled_queries
 
 # Minimum rows each query must return on the seeded data (exact counts are noted
 # where the seed pins them). A query that "runs" but returns nothing is a failure.
-MIN_ROWS = {1: 1, 2: 1, 3: 2, 4: 10, 5: 3, 6: 3, 7: 5, 8: 4, 9: 3, 10: 3, 11: 2, 12: 1}
+MIN_ROWS = {1: 1, 2: 1, 3: 2, 4: 10, 5: 3, 6: 3, 7: 5, 8: 4, 9: 3, 10: 3, 11: 2, 12: 1,
+            13: 5, 14: 3, 15: 2, 16: 2, 17: 2, 18: 1}
 
 
 def test_all_queries():

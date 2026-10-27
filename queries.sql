@@ -220,3 +220,94 @@ WHERE sub.mess_id = 1
       JOIN meal_slots ms ON a.slot_id = ms.slot_id
       WHERE a.attendance_date = @on_date AND ms.slot_name = 'LUNCH'
   );
+
+-- QUERY 13: Waste per meal per day (kg, % of cooked food, rupee cost)
+SELECT mess_name, production_date, slot_name, diet_category,
+       prepared_kg, waste_kg, waste_pct, waste_cost_inr
+FROM v_waste_summary
+ORDER BY production_date DESC, mess_name, slot_name;
+
+-- QUERY 14: Root cause of waste (which reason costs the most)
+SELECT w.reason,
+       ROUND(SUM(w.waste_kg), 2) AS total_waste_kg,
+       ROUND(SUM(w.waste_kg * p.cost_per_kg), 2) AS cost_inr,
+       ROUND(100 * SUM(w.waste_kg) / (SELECT SUM(waste_kg) FROM food_waste_log), 1) AS pct_of_total
+FROM food_waste_log w
+JOIN meal_production p ON w.production_id = p.production_id
+GROUP BY w.reason
+ORDER BY total_waste_kg DESC;
+
+-- QUERY 15: Dish-level waste vs student rating (wasted AND disliked = fix the recipe)
+SELECT m.mess_name, wm.day_of_week, ms.slot_name, wm.diet_category, wm.menu_items,
+       ROUND(wa.waste_kg, 2) AS waste_kg,
+       fb.avg_rating, fb.reviews
+FROM weekly_menus wm
+JOIN messes m ON wm.mess_id = m.mess_id
+JOIN meal_slots ms ON wm.slot_id = ms.slot_id
+JOIN (SELECT menu_id, SUM(waste_kg) AS waste_kg
+      FROM food_waste_log WHERE menu_id IS NOT NULL GROUP BY menu_id) wa ON wa.menu_id = wm.menu_id
+LEFT JOIN (SELECT menu_id, ROUND(AVG(rating), 2) AS avg_rating, COUNT(*) AS reviews
+           FROM mess_feedbacks WHERE menu_id IS NOT NULL GROUP BY menu_id) fb ON fb.menu_id = wm.menu_id
+ORDER BY wa.waste_kg DESC;
+
+-- QUERY 16: Production target for tomorrow's lunch
+-- headcount = active subscribers - approved leaves - declared opt-outs
+-- kg per head = (cooked - wasted) / planned heads over last 14 days (actual consumption)
+SET @target_date = CURDATE() + INTERVAL 1 DAY, @target_slot = 2;
+WITH waste AS (
+    SELECT production_id, SUM(waste_kg) AS waste_kg FROM food_waste_log GROUP BY production_id
+),
+hist AS (
+    SELECT p.mess_id, p.slot_id, p.diet_category,
+           SUM(p.prepared_kg - COALESCE(w.waste_kg, 0)) / SUM(p.planned_headcount) AS net_kg_per_head
+    FROM meal_production p
+    LEFT JOIN waste w ON w.production_id = p.production_id
+    WHERE p.production_date >= CURDATE() - INTERVAL 14 DAY AND p.planned_headcount > 0
+    GROUP BY p.mess_id, p.slot_id, p.diet_category
+),
+demand AS (
+    SELECT sub.mess_id,
+           CASE WHEN s.dietary_preference IN ('NON_VEG', 'EGG_ONLY') THEN 'NON_VEG' ELSE 'VEG' END AS diet_group,
+           COUNT(*) AS headcount
+    FROM student_mess_subscriptions sub
+    JOIN students s ON sub.student_id = s.student_id
+    WHERE sub.status = 'ACTIVE'
+      AND s.account_status = 'ACTIVE'
+      AND @target_date BETWEEN sub.start_date AND sub.end_date
+      AND s.student_id NOT IN (SELECT student_id FROM mess_rebates
+                               WHERE status = 'APPROVED' AND @target_date BETWEEN start_date AND end_date)
+      AND s.student_id NOT IN (SELECT student_id FROM meal_optouts
+                               WHERE meal_date = @target_date AND slot_id = @target_slot)
+    GROUP BY sub.mess_id, diet_group
+)
+SELECT m.mess_name, d.diet_group, d.headcount,
+       ROUND(h.net_kg_per_head, 3) AS net_kg_per_head,
+       ROUND(d.headcount * h.net_kg_per_head, 2) AS suggested_kg_to_cook
+FROM demand d
+JOIN messes m ON d.mess_id = m.mess_id
+LEFT JOIN hist h ON h.mess_id = d.mess_id AND h.diet_category = d.diet_group AND h.slot_id = @target_slot
+ORDER BY m.mess_name, d.diet_group;
+
+-- QUERY 17: Weekly waste trend per mess (is it going down?)
+SELECT mess_name,
+       YEARWEEK(production_date, 1) AS year_week,
+       ROUND(SUM(prepared_kg), 2) AS cooked_kg,
+       ROUND(SUM(waste_kg), 2) AS wasted_kg,
+       ROUND(100 * SUM(waste_kg) / SUM(prepared_kg), 1) AS waste_pct,
+       ROUND(SUM(waste_cost_inr), 2) AS cost_inr
+FROM v_waste_summary
+GROUP BY mess_name, YEARWEEK(production_date, 1)
+ORDER BY mess_name, year_week;
+
+-- QUERY 18: Feedback action list - dishes students leave on the plate
+SELECT m.mess_name, wm.menu_items,
+       COUNT(*) AS responses,
+       SUM(f.plate_left IN ('HALF', 'MOST')) AS heavy_leftover_reports,
+       ROUND(AVG(f.rating), 2) AS avg_rating
+FROM mess_feedbacks f
+JOIN weekly_menus wm ON f.menu_id = wm.menu_id
+JOIN messes m ON wm.mess_id = m.mess_id
+WHERE f.plate_left IS NOT NULL
+GROUP BY wm.menu_id, m.mess_name, wm.menu_items
+HAVING heavy_leftover_reports >= 1
+ORDER BY heavy_leftover_reports DESC;

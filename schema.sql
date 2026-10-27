@@ -115,6 +115,60 @@ CREATE TABLE weekly_menus (
     CONSTRAINT uq_menu UNIQUE (mess_id, day_of_week, slot_id, diet_category)
 ) ENGINE=InnoDB;
 
+-- 6a. MEAL OPT-OUTS (student declares in advance he will skip a meal -> kitchen cooks less)
+CREATE TABLE meal_optouts (
+    optout_id INT PRIMARY KEY AUTO_INCREMENT,
+    student_id INT NOT NULL,
+    mess_id INT NOT NULL,
+    slot_id INT NOT NULL,
+    meal_date DATE NOT NULL,
+    reason VARCHAR(15) NOT NULL DEFAULT 'OTHER',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_optout_student FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
+    CONSTRAINT fk_optout_mess FOREIGN KEY (mess_id) REFERENCES messes(mess_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_optout_slot FOREIGN KEY (slot_id) REFERENCES meal_slots(slot_id) ON DELETE RESTRICT,
+    CONSTRAINT chk_optout_reason CHECK (reason IN ('ACADEMIC', 'EATING_OUT', 'OTHER')),
+    CONSTRAINT uq_optout UNIQUE (student_id, slot_id, meal_date)
+) ENGINE=InnoDB;
+
+-- 6b. MEAL PRODUCTION (what kitchen actually cooked, per mess / date / meal / diet line)
+CREATE TABLE meal_production (
+    production_id INT PRIMARY KEY AUTO_INCREMENT,
+    mess_id INT NOT NULL,
+    slot_id INT NOT NULL,
+    production_date DATE NOT NULL,
+    diet_category VARCHAR(15) NOT NULL,
+    planned_headcount INT NOT NULL,
+    prepared_kg DECIMAL(8, 2) NOT NULL,
+    cost_per_kg DECIMAL(8, 2) NOT NULL,
+    prepared_by VARCHAR(100),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_prod_mess FOREIGN KEY (mess_id) REFERENCES messes(mess_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_prod_slot FOREIGN KEY (slot_id) REFERENCES meal_slots(slot_id) ON DELETE RESTRICT,
+    CONSTRAINT chk_prod_diet CHECK (diet_category IN ('VEG', 'NON_VEG', 'COMMON')),
+    CONSTRAINT chk_prod_headcount CHECK (planned_headcount >= 0),
+    CONSTRAINT chk_prod_kg CHECK (prepared_kg > 0),
+    CONSTRAINT chk_prod_cost CHECK (cost_per_kg >= 0),
+    CONSTRAINT uq_production UNIQUE (mess_id, slot_id, production_date, diet_category)
+) ENGINE=InnoDB;
+
+-- 6c. FOOD WASTE LOG (where, why, how much; menu_id optional -> dish-level waste)
+CREATE TABLE food_waste_log (
+    waste_id INT PRIMARY KEY AUTO_INCREMENT,
+    production_id INT NOT NULL,
+    menu_id INT NULL,
+    waste_stage VARCHAR(15) NOT NULL,
+    reason VARCHAR(20) NOT NULL,
+    waste_kg DECIMAL(8, 2) NOT NULL,
+    recorded_by VARCHAR(100),
+    recorded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_waste_prod FOREIGN KEY (production_id) REFERENCES meal_production(production_id) ON DELETE CASCADE,
+    CONSTRAINT fk_waste_menu FOREIGN KEY (menu_id) REFERENCES weekly_menus(menu_id) ON DELETE SET NULL,
+    CONSTRAINT chk_waste_stage CHECK (waste_stage IN ('PREPARATION', 'LEFTOVER', 'PLATE')),
+    CONSTRAINT chk_waste_reason CHECK (reason IN ('OVERPRODUCTION', 'LOW_ATTENDANCE', 'POOR_QUALITY', 'SPOILAGE', 'OVERPORTIONING', 'OTHER')),
+    CONSTRAINT chk_waste_kg CHECK (waste_kg >= 0)
+) ENGINE=InnoDB;
+
 -- 7. MEAL ATTENDANCE
 CREATE TABLE meal_attendance (
     attendance_id INT PRIMARY KEY AUTO_INCREMENT,
@@ -204,13 +258,15 @@ CREATE TABLE guest_meals (
     CONSTRAINT chk_guest_status CHECK (status IN ('BOOKED', 'CONSUMED', 'CANCELLED'))
 ) ENGINE=InnoDB;
 
--- 11. MESS FEEDBACKS
+-- 11. MESS FEEDBACKS (menu_id = optional dish-level link; plate_left = how much food left on plate)
 CREATE TABLE mess_feedbacks (
     feedback_id INT PRIMARY KEY AUTO_INCREMENT,
     student_id INT NOT NULL,
     mess_id INT NOT NULL,
     slot_id INT NULL,
+    menu_id INT NULL,
     rating INT NOT NULL,
+    plate_left VARCHAR(10) NULL,
     category VARCHAR(30) NOT NULL,
     comments TEXT NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'OPEN',
@@ -219,8 +275,10 @@ CREATE TABLE mess_feedbacks (
     CONSTRAINT fk_fb_student FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
     CONSTRAINT fk_fb_mess FOREIGN KEY (mess_id) REFERENCES messes(mess_id) ON DELETE RESTRICT,
     CONSTRAINT fk_fb_slot FOREIGN KEY (slot_id) REFERENCES meal_slots(slot_id) ON DELETE SET NULL,
+    CONSTRAINT fk_fb_menu FOREIGN KEY (menu_id) REFERENCES weekly_menus(menu_id) ON DELETE SET NULL,
     CONSTRAINT chk_fb_rating CHECK (rating BETWEEN 1 AND 5),
-    CONSTRAINT chk_fb_category CHECK (category IN ('FOOD_QUALITY', 'HYGIENE', 'PORTION_SIZE', 'STAFF_BEHAVIOR', 'PUNCTUALITY', 'OTHER')),
+    CONSTRAINT chk_fb_plate CHECK (plate_left IS NULL OR plate_left IN ('NONE', 'QUARTER', 'HALF', 'MOST')),
+    CONSTRAINT chk_fb_category CHECK (category IN ('FOOD_QUALITY', 'HYGIENE', 'PORTION_SIZE', 'STAFF_BEHAVIOR', 'PUNCTUALITY', 'TASTE', 'FOOD_WASTE', 'OTHER')),
     CONSTRAINT chk_fb_status CHECK (status IN ('OPEN', 'UNDER_REVIEW', 'RESOLVED'))
 ) ENGINE=InnoDB;
 
@@ -250,6 +308,9 @@ CREATE INDEX idx_attendance_student ON meal_attendance(student_id, attendance_da
 CREATE INDEX idx_rebates_dates ON mess_rebates(start_date, end_date, status);
 CREATE INDEX idx_bills_payment_status ON monthly_bills(payment_status);
 CREATE INDEX idx_feedback_mess_rating ON mess_feedbacks(mess_id, rating);
+CREATE INDEX idx_production_date ON meal_production(production_date, mess_id);
+CREATE INDEX idx_waste_reason ON food_waste_log(reason);
+CREATE INDEX idx_waste_menu ON food_waste_log(menu_id);
 
 -- VIEWS
 CREATE VIEW v_active_student_directory AS
@@ -286,3 +347,22 @@ SELECT
 FROM messes m
 LEFT JOIN mess_feedbacks f ON m.mess_id = f.mess_id
 GROUP BY m.mess_id, m.mess_name, m.mess_type;
+
+CREATE VIEW v_waste_summary AS
+SELECT
+    p.production_id,
+    m.mess_name,
+    p.production_date,
+    ms.slot_name,
+    p.diet_category,
+    p.planned_headcount,
+    p.prepared_kg,
+    COALESCE(SUM(w.waste_kg), 0) AS waste_kg,
+    ROUND(COALESCE(SUM(w.waste_kg), 0) / p.prepared_kg * 100, 1) AS waste_pct,
+    ROUND(COALESCE(SUM(w.waste_kg), 0) * p.cost_per_kg, 2) AS waste_cost_inr
+FROM meal_production p
+JOIN messes m ON p.mess_id = m.mess_id
+JOIN meal_slots ms ON p.slot_id = ms.slot_id
+LEFT JOIN food_waste_log w ON w.production_id = p.production_id
+GROUP BY p.production_id, m.mess_name, p.production_date, ms.slot_name,
+         p.diet_category, p.planned_headcount, p.prepared_kg, p.cost_per_kg;
