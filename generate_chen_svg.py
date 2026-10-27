@@ -33,9 +33,11 @@ Design notes
 
 import math
 import os
+import re
 from xml.sax.saxutils import escape
 
 SVG_OUTPUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chen_er_diagram.svg")
+HTML_OUTPUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chen_er_diagram.html")
 
 # ---------------------------------------------------------------------------
 # Canvas & design tokens
@@ -388,6 +390,19 @@ def render_legend(x, y):
     out.append("</g>")
     return "\n".join(out)
 
+def inline_into_html(svg_text):
+    """Embed SVG between <!--SVG_START--> and <!--SVG_END--> so viewer works on file://."""
+    with open(HTML_OUTPUT, "r", encoding="utf-8") as f:
+        html = f.read()
+    pat = re.compile(r"<!--SVG_START-->.*?<!--SVG_END-->", re.S)
+    if not pat.search(html):
+        print("[WARN] SVG markers not found in chen_er_diagram.html; skipped inline")
+        return
+    block = "<!--SVG_START-->" + svg_text + "<!--SVG_END-->"
+    html = pat.sub(lambda m: block, html, count=1)
+    with open(HTML_OUTPUT, "w", encoding="utf-8") as f:
+        f.write(html)
+    print(f"[OK] Inlined SVG into: {HTML_OUTPUT}")
 
 def create_svg():
     build()
@@ -440,9 +455,11 @@ def create_svg():
     svg.append("</g>")
     svg.append("</svg>")
 
+    svg_text = "\n".join(svg)
     with open(SVG_OUTPUT, "w", encoding="utf-8") as f:
-        f.write("\n".join(svg))
+        f.write(svg_text)
     print(f"[OK] Generated Chen ER Diagram SVG: {SVG_OUTPUT}")
+    inline_into_html(svg_text)
 
 
 if __name__ == "__main__":

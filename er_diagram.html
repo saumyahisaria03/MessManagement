@@ -202,6 +202,14 @@
         .dot.pk { background: var(--accent-amber); }
         .dot.fk { background: var(--accent-blue); }
         .dot.req { background: var(--accent-rose); }
+
+        #mermaid-output svg .entityBox,
+        #mermaid-output svg rect.er.entityBox { fill: #1e293b !important; stroke: #38bdf8 !important; }
+        #mermaid-output svg .er.entityLabel,
+        #mermaid-output svg .label text,
+        #mermaid-output svg text { fill: #f8fafc !important; }
+        #mermaid-output svg .relationshipLabelBox { fill: #0f172a !important; }
+        #mermaid-output svg .relationshipLabel { fill: #f8fafc !important; }
     </style>
 </head>
 <body>
@@ -519,7 +527,21 @@ erDiagram
     <script>
         mermaid.initialize({
             startOnLoad: true,
-            theme: 'dark',
+            theme: 'neutral',
+            themeVariables: {
+                darkMode: true,
+                background: '#0f172a',
+                primaryColor: '#1e293b',
+                primaryTextColor: '#f8fafc',
+                primaryBorderColor: '#38bdf8',
+                lineColor: '#94a3b8',
+                secondaryColor: '#1e293b',
+                tertiaryColor: '#0f172a',
+                textColor: '#f8fafc',
+                attributeBackgroundColorOdd: '#1e293b',
+                attributeBackgroundColorEven: '#273449',
+                fontFamily: 'Segoe UI, Arial, sans-serif'
+            },
             er: {
                 useMaxWidth: false,
                 diagramPadding: 40,
